@@ -1,5 +1,6 @@
 package controllers;
 
+import model.RolesModel;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
@@ -12,9 +13,11 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import model.UsuarioModel;
 import model.RolesModel;
 import sv.edu.udb.www.utils.Validaciones;
 
@@ -22,11 +25,12 @@ import sv.edu.udb.www.utils.Validaciones;
  *
  * @author TuNombre
  */
-@WebServlet(name = "RolesController", urlPatterns = {"/roles.do"})
-public class RolesController extends HttpServlet {
+@WebServlet(name = "UsuariosController", urlPatterns = {"/usuarios.do"})
+public class UsuariosController extends HttpServlet {
 
     ArrayList<String> listaErrores = new ArrayList<>();
-    RolesModel modelo = new RolesModel();
+    UsuarioModel modelo = new UsuarioModel();
+    RolesModel roles = new RolesModel(); // Asumiendo que tienes este modelo
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -53,6 +57,8 @@ public class RolesController extends HttpServlet {
                 eliminar(request, response);
             } else if ("detalles".equals(operacion)) {
                 detalles(request, response);
+            } else if ("login".equals(operacion)) {
+                login(request, response);
             } else {
                 request.getRequestDispatcher("/error404.jsp").forward(request, response);
             }
@@ -79,19 +85,21 @@ public class RolesController extends HttpServlet {
 
     private void listar(HttpServletRequest request, HttpServletResponse response) {
         try {
-            List<JSONObject> lista = modelo.listarRoles();
-            request.setAttribute("listaRoles", lista);
-            request.getRequestDispatcher("/roles/listaRoles.jsp").forward(request, response);
+            List<JSONObject> lista = modelo.listarUsuarios();
+            request.setAttribute("listaUsuarios", lista);
+            request.getRequestDispatcher("/usuarios/listaUsuarios.jsp").forward(request, response);
         } catch (ServletException | IOException ex) {
-            Logger.getLogger(RolesController.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     private void nuevo(HttpServletRequest request, HttpServletResponse response) {
         try {
-            request.getRequestDispatcher("/roles/nuevoRol.jsp").forward(request, response);
+            // Cargar listas para el formulario
+            request.setAttribute("listaRoles", roles.listarRoles());
+            request.getRequestDispatcher("/usuarios/nuevoUsuario.jsp").forward(request, response);
         } catch (ServletException | IOException ex) {
-            Logger.getLogger(RolesController.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -111,42 +119,44 @@ public class RolesController extends HttpServlet {
             String jsonString = sb.toString();
 
             if (jsonString.isEmpty()) {
-                listaErrores.add("No se recibió información para registrar el rol.");
+                listaErrores.add("No se recibió información para registrar el usuario.");
             } else {
                 JSONParser parser = new JSONParser();
                 JSONObject data = (JSONObject) parser.parse(jsonString);
 
                 // Validaciones
-                if (Validaciones.isEmpty((String) data.get("nombre_rol"))) {
-                    listaErrores.add("El nombre del rol es obligatorio.");
+                if (Validaciones.isEmpty((String) data.get("nombre"))) {
+                    listaErrores.add("El nombre es obligatorio.");
                 }
-                Long cantMaxPrestamo = (Long) data.get("cant_max_prestamo");
-                if (cantMaxPrestamo == null || cantMaxPrestamo < 0) {
-                    listaErrores.add("La cantidad máxima de préstamos debe ser un número positivo.");
+                if (Validaciones.isEmpty((String) data.get("apellido"))) {
+                    listaErrores.add("El apellido es obligatorio.");
                 }
-                Long diasPrestamo = (Long) data.get("dias_prestamo");
-                if (diasPrestamo == null || diasPrestamo < 0) {
-                    listaErrores.add("Los días de préstamo deben ser un número positivo.");
+                if (Validaciones.isEmpty((String) data.get("correo"))) {
+                    listaErrores.add("El correo es obligatorio.");
+                } /*else if (!Validaciones.esCorreoValido((String) data.get("correo"))) {
+                    listaErrores.add("El correo no tiene un formato válido.");
+                }*/
+                if (Validaciones.isEmpty((String) data.get("contrasena"))) {
+                    listaErrores.add("La contraseña es obligatoria.");
                 }
-                Double moraDiaria = (Double) data.get("mora_diaria");
-                if (moraDiaria == null || moraDiaria < 0) {
-                    listaErrores.add("La mora diaria debe ser un número positivo.");
+                if (data.get("id_rol") == null) {
+                    listaErrores.add("El rol es obligatorio.");
                 }
 
                 if (listaErrores.isEmpty()) {
-                    boolean ok = modelo.registrarRol(data);
+                    boolean ok = modelo.registrarUsuario(data);
                     if (ok) {
-                        request.getSession().setAttribute("exito", "Rol registrado exitosamente.");
-                        out.print("{\"success\": true, \"message\": \"Rol registrado exitosamente.\"}");
+                        request.getSession().setAttribute("exito", "Usuario registrado exitosamente.");
+                        out.print("{\"success\": true, \"message\": \"Usuario registrado exitosamente.\"}");
                     } else {
-                        out.print("{\"success\": false, \"message\": \"No se pudo registrar el rol (posible duplicado).\"}");
+                        out.print("{\"success\": false, \"message\": \"No se pudo registrar el usuario (posible duplicado).\"}");
                     }
                 } else {
                     out.print("{\"success\": false, \"errors\": " + listaErrores.toString() + "}");
                 }
             }
         } catch (IOException | ParseException ex) {
-            Logger.getLogger(RolesController.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
             out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
         }
     }
@@ -154,15 +164,16 @@ public class RolesController extends HttpServlet {
     private void obtener(HttpServletRequest request, HttpServletResponse response) {
         try {
             int id = Integer.parseInt(request.getParameter("id"));
-            JSONObject rol = modelo.obtenerPorId(id);
-            if (rol != null) {
-                request.setAttribute("rol", rol);
-                request.getRequestDispatcher("/roles/editarRol.jsp").forward(request, response);
+            JSONObject usuario = modelo.obtenerPorId(id);
+            if (usuario != null) {
+                request.setAttribute("usuario", usuario);
+                request.setAttribute("listaRoles", roles.listarRoles());
+                request.getRequestDispatcher("/usuarios/editarUsuario.jsp").forward(request, response);
             } else {
                 response.sendRedirect(request.getContextPath() + "/error404.jsp");
             }
         } catch (ServletException | IOException ex) {
-            Logger.getLogger(RolesController.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -182,42 +193,42 @@ public class RolesController extends HttpServlet {
             String jsonString = sb.toString();
 
             if (jsonString.isEmpty()) {
-                listaErrores.add("No se recibió información para modificar el rol.");
+                listaErrores.add("No se recibió información para modificar el usuario.");
             } else {
                 JSONParser parser = new JSONParser();
                 JSONObject data = (JSONObject) parser.parse(jsonString);
+                // El id_usuario debe venir en el JSON o en la URL
 
                 // Validaciones
-                if (Validaciones.isEmpty((String) data.get("nombre_rol"))) {
-                    listaErrores.add("El nombre del rol es obligatorio.");
+                if (Validaciones.isEmpty((String) data.get("nombre"))) {
+                    listaErrores.add("El nombre es obligatorio.");
                 }
-                Long cantMaxPrestamo = (Long) data.get("cant_max_prestamo");
-                if (cantMaxPrestamo == null || cantMaxPrestamo < 0) {
-                    listaErrores.add("La cantidad máxima de préstamos debe ser un número positivo.");
+                if (Validaciones.isEmpty((String) data.get("apellido"))) {
+                    listaErrores.add("El apellido es obligatorio.");
                 }
-                Long diasPrestamo = (Long) data.get("dias_prestamo");
-                if (diasPrestamo == null || diasPrestamo < 0) {
-                    listaErrores.add("Los días de préstamo deben ser un número positivo.");
-                }
-                Double moraDiaria = (Double) data.get("mora_diaria");
-                if (moraDiaria == null || moraDiaria < 0) {
-                    listaErrores.add("La mora diaria debe ser un número positivo.");
+                if (Validaciones.isEmpty((String) data.get("correo"))) {
+                    listaErrores.add("El correo es obligatorio.");
+                } /*else if (!Validaciones.esCorreoValido((String) data.get("correo"))) {
+                    listaErrores.add("El correo no tiene un formato válido.");
+                }*/
+                if (data.get("id_rol") == null) {
+                    listaErrores.add("El rol es obligatorio.");
                 }
 
                 if (listaErrores.isEmpty()) {
-                    boolean ok = modelo.actualizarRol(data);
+                    boolean ok = modelo.actualizarUsuario(data);
                     if (ok) {
-                        request.getSession().setAttribute("exito", "Rol modificado exitosamente.");
-                        out.print("{\"success\": true, \"message\": \"Rol modificado exitosamente.\"}");
+                        request.getSession().setAttribute("exito", "Usuario modificado exitosamente.");
+                        out.print("{\"success\": true, \"message\": \"Usuario modificado exitosamente.\"}");
                     } else {
-                        out.print("{\"success\": false, \"message\": \"No se pudo modificar el rol.\"}");
+                        out.print("{\"success\": false, \"message\": \"No se pudo modificar el usuario.\"}");
                     }
                 } else {
                     out.print("{\"success\": false, \"errors\": " + listaErrores.toString() + "}");
                 }
             }
         } catch (IOException | ParseException ex) {
-            Logger.getLogger(RolesController.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
             out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
         }
     }
@@ -225,15 +236,15 @@ public class RolesController extends HttpServlet {
     private void eliminar(HttpServletRequest request, HttpServletResponse response) {
         try {
             int id = Integer.parseInt(request.getParameter("id"));
-            boolean ok = modelo.eliminarRol(id);
+            boolean ok = modelo.eliminarUsuario(id);
             if (ok) {
-                request.setAttribute("exito", "Rol eliminado exitosamente.");
+                request.setAttribute("exito", "Usuario eliminado exitosamente.");
             } else {
-                request.setAttribute("fracaso", "No se puede eliminar este rol.");
+                request.setAttribute("fracaso", "No se puede eliminar este usuario.");
             }
-            request.getRequestDispatcher("/roles.do?op=listar").forward(request, response);
+            request.getRequestDispatcher("/usuarios.do?op=listar").forward(request, response);
         } catch (ServletException | IOException ex) {
-            Logger.getLogger(RolesController.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
@@ -241,14 +252,41 @@ public class RolesController extends HttpServlet {
         try {
             PrintWriter out = response.getWriter();
             int id = Integer.parseInt(request.getParameter("id"));
-            JSONObject rol = modelo.obtenerPorId(id);
-            if (rol != null) {
-                out.print(rol.toJSONString());
+            JSONObject usuario = modelo.obtenerPorId(id);
+            if (usuario != null) {
+                out.print(usuario.toJSONString());
             } else {
-                out.print("{\"error\": \"Rol no encontrado\"}");
+                out.print("{\"error\": \"Usuario no encontrado\"}");
             }
         } catch (IOException ex) {
-            Logger.getLogger(RolesController.class.getName()).log(Level.SEVERE, null, ex);
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    // Nueva operación: login
+    private void login(HttpServletRequest request, HttpServletResponse response) {
+        PrintWriter out = null;
+        try {
+            out = response.getWriter();
+            String correo = request.getParameter("correo");
+            String contrasena = request.getParameter("contrasena");
+
+            if (Validaciones.isEmpty(correo) || Validaciones.isEmpty(contrasena)) {
+                out.print("{\"success\": false, \"message\": \"Correo y contraseña son obligatorios.\"}");
+                return;
+            }
+
+            JSONObject usuario = modelo.login(correo, contrasena);
+            if (usuario != null) {
+                HttpSession session = request.getSession();
+                session.setAttribute("usuario", usuario); // Guardar en sesión
+                out.print("{\"success\": true, \"message\": \"Login exitoso.\"}");
+            } else {
+                out.print("{\"success\": false, \"message\": \"Credenciales inválidas.\"}");
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
+            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
         }
     }
 }

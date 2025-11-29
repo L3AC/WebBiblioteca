@@ -293,7 +293,7 @@ public class LibrosController extends HttpServlet {
             json.put("editorial", libro.getEditorial().getNombreEditorial());
             json.put("autor",libro.getAutor().getNombreAutor());
             json.put("genero", libro.getGenero().getNombreGenero());
-            json.put("descripcion", libro.getDescripcion());
+            json.put("descripcion", libro.getDescripcion()); 
             out.print(json);
         } catch (SQLException ex) {
             Logger.getLogger(LibrosController.class.getName()).log(Level.SEVERE, null, ex);
