@@ -6,18 +6,18 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import model.EjemplaresModel;
-import sv.edu.udb.www.model.AutoresModel;
+/*import sv.edu.udb.www.model.AutoresModel;
 import sv.edu.udb.www.model.GenerosModel;
-import model.EditorialesModel;
+import model.EditorialesModel;*/
 import sv.edu.udb.www.utils.Validaciones;
 
 @WebServlet(name = "EjemplaresController", urlPatterns = {"/ejemplares.do"})
@@ -25,9 +25,9 @@ public class EjemplaresController extends HttpServlet {
 
     ArrayList<String> listaErrores = new ArrayList<>();
     EjemplaresModel modelo = new EjemplaresModel();
-    AutoresModel autores = new AutoresModel();
+    /*AutoresModel autores = new AutoresModel();
     GenerosModel generos = new GenerosModel();
-    EditorialesModel editoriales = new EditorialesModel();
+    EditorialesModel editoriales = new EditorialesModel();*/
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -90,7 +90,7 @@ public class EjemplaresController extends HttpServlet {
     }
 
     private void nuevo(HttpServletRequest request, HttpServletResponse response) {
-        try {
+        /*try {
             // Cargar listas para el formulario
             request.setAttribute("listaAutores", autores.listarAutores());
             request.setAttribute("listaGeneros", generos.listarGeneros());
@@ -98,7 +98,7 @@ public class EjemplaresController extends HttpServlet {
             request.getRequestDispatcher("/ejemplares/nuevoEjemplar.jsp").forward(request, response);
         } catch (SQLException | ServletException | IOException ex) {
             Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        }*/
     }
 
     private void insertar(HttpServletRequest request, HttpServletResponse response) {

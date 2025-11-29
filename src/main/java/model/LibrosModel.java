@@ -1,3 +1,4 @@
+/*
 package sv.edu.udb.www.model;
 
 import java.sql.SQLException;
@@ -176,4 +177,4 @@ public Libro detalleLibro(String codigo) throws SQLException{
             return 0;
         }
     }
-}
+}*/

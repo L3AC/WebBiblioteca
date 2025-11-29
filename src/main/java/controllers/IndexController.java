@@ -10,15 +10,15 @@ import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import sv.edu.udb.www.model.AutoresModel;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+/*import sv.edu.udb.www.model.AutoresModel;
 import sv.edu.udb.www.model.EditorialesModel;
 import sv.edu.udb.www.model.GenerosModel;
-import sv.edu.udb.www.model.LibrosModel;
+import sv.edu.udb.www.model.LibrosModel;*/
 
 /**
  *
@@ -27,10 +27,10 @@ import sv.edu.udb.www.model.LibrosModel;
 @WebServlet(name = "IndexController", urlPatterns = {"/index.do"})
 public class IndexController extends HttpServlet {
 
-    AutoresModel autor = new AutoresModel(); 
+    /*AutoresModel autor = new AutoresModel(); 
     EditorialesModel editorial = new EditorialesModel();
     LibrosModel libro = new LibrosModel();
-    GenerosModel genero = new GenerosModel();
+    GenerosModel genero = new GenerosModel();*/
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
@@ -88,7 +88,7 @@ public class IndexController extends HttpServlet {
     }// </editor-fold>
 
     private void mostrar(HttpServletRequest request, HttpServletResponse response) {
-        try {
+        /*try {
             request.setAttribute("totalaut",autor.totalAutores());
             request.setAttribute("totaledit", editorial.totalEditoriales());
             request.setAttribute("totallib", libro.totalLibros());
@@ -96,7 +96,7 @@ public class IndexController extends HttpServlet {
             request.getRequestDispatcher("index.jsp").forward(request, response);
         } catch (SQLException | ServletException | IOException ex) {
             Logger.getLogger(IndexController.class.getName()).log(Level.SEVERE, null, ex);
-        }
+        }*/
     }
 
 }

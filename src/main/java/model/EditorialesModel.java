@@ -1,4 +1,4 @@
-
+/*
 package model;
 
 import java.sql.SQLException;
@@ -134,4 +134,4 @@ public class EditorialesModel extends Conexion {
             return 0;
         }
     }
-}
+}*/

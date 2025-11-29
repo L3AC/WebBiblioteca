@@ -1,4 +1,4 @@
-package sv.edu.udb.www.model;
+/*package sv.edu.udb.www.model;
 
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -125,4 +125,4 @@ public class AutoresModel  extends Conexion{
             this.desconectar();
         }
     }
-}
+}*/

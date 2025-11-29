@@ -1,4 +1,4 @@
-
+/*
 package sv.edu.udb.www.model;
 
 import java.sql.SQLException;
@@ -125,4 +125,4 @@ public class GenerosModel extends Conexion{
             return 0;
         }
     }
-}
+}*/
