@@ -4,7 +4,7 @@ import java.sql.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.json.simple.JSONObject;
-import static utils.ConexionBD.getConnection;
+import static utils.ConexionBD.getConnection;  
 
 public class EjemplarModel extends Conexion {
 
