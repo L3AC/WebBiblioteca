@@ -1,5 +1,6 @@
 package model;
 
+import static java.lang.System.out;
 import java.sql.*;
 import java.util.List;
 import java.util.ArrayList;
@@ -14,15 +15,14 @@ public class UsuarioModel extends Conexion {
     // === LOGIN: Validar credenciales y retornar información del usuario como JSON ===
     public JSONObject login(String correo, String contrasenaPlana) {
         String sql = """
-            SELECT u.id_usuario, u.nombre, u.apellido, u.correo,
-                   r.id_rol, r.nombre_rol, r.cant_max_prestamo, r.dias_prestamo, r.mora_diaria
-            FROM Usuarios u
-            JOIN Roles r ON u.id_rol = r.id_rol
-            WHERE u.correo = ?
-            """;
+        SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.contrasena,
+               r.id_rol, r.nombre_rol, r.cant_max_prestamo, r.dias_prestamo, r.mora_diaria
+        FROM Usuarios u
+        JOIN Roles r ON u.id_rol = r.id_rol
+        WHERE u.correo = ?
+        """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, correo);
             try (ResultSet rs = ps.executeQuery()) {
@@ -44,21 +44,15 @@ public class UsuarioModel extends Conexion {
                         rol.put("mora_diaria", rs.getDouble("mora_diaria"));
 
                         usuario.put("rol", rol);
-
-                        Logger.getLogger(UsuarioModel.class.getName()).log(Level.INFO, "Login exitoso: {0}", correo);
                         return usuario;
-                    } else {
-                        Logger.getLogger(UsuarioModel.class.getName()).log(Level.WARNING, "Contraseña incorrecta para correo: {0}", correo);
                     }
-                } else {
-                    Logger.getLogger(UsuarioModel.class.getName()).log(Level.WARNING, "Correo no encontrado: {0}", correo);
                 }
             }
-
         } catch (SQLException e) {
             Logger.getLogger(UsuarioModel.class.getName()).log(Level.SEVERE, "Error al intentar login con correo: " + correo, e);
+            // ✅ No lanzar la excepción, solo loggearla
         }
-        return null;
+        return null; // ✅ Si falla, devolver null
     }
 
     // === REGISTRAR USUARIO (con contraseña encriptada) ===
@@ -74,8 +68,7 @@ public class UsuarioModel extends Conexion {
             VALUES (?, ?, ?, ?, ?)
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setString(1, (String) data.get("nombre"));
             ps.setString(2, (String) data.get("apellido"));
@@ -107,8 +100,7 @@ public class UsuarioModel extends Conexion {
     // === VERIFICAR SI CORREO EXISTE ===
     private boolean existeCorreo(String correo) {
         String sql = "SELECT 1 FROM Usuarios WHERE correo = ?";
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, correo);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
@@ -129,8 +121,7 @@ public class UsuarioModel extends Conexion {
             WHERE u.id_usuario = ?
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, idUsuario);
             try (ResultSet rs = ps.executeQuery()) {
@@ -169,9 +160,7 @@ public class UsuarioModel extends Conexion {
             ORDER BY u.id_usuario
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
                 JSONObject rol = new JSONObject();
@@ -221,8 +210,7 @@ public class UsuarioModel extends Conexion {
             }
         }
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql.toString())) {
 
             int idx = 1;
             ps.setString(idx++, (String) data.get("nombre"));
@@ -246,8 +234,7 @@ public class UsuarioModel extends Conexion {
     // === ELIMINAR USUARIO ===
     public boolean eliminarUsuario(int idUsuario) {
         String sql = "DELETE FROM Usuarios WHERE id_usuario = ?";
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idUsuario);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -266,8 +253,7 @@ public class UsuarioModel extends Conexion {
             WHERE u.correo = ?
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, correo);
             try (ResultSet rs = ps.executeQuery()) {

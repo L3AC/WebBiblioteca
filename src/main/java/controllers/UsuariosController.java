@@ -19,12 +19,8 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import model.UsuarioModel;
 import model.RolesModel;
-import sv.edu.udb.www.utils.Validaciones;
+import utils.Validaciones;
 
-/**
- *
- * @author TuNombre
- */
 @WebServlet(name = "UsuariosController", urlPatterns = {"/usuarios.do"})
 public class UsuariosController extends HttpServlet {
 
@@ -133,7 +129,8 @@ public class UsuariosController extends HttpServlet {
                 }
                 if (Validaciones.isEmpty((String) data.get("correo"))) {
                     listaErrores.add("El correo es obligatorio.");
-                } /*else if (!Validaciones.esCorreoValido((String) data.get("correo"))) {
+                }
+                /*else if (!Validaciones.esCorreoValido((String) data.get("correo"))) {
                     listaErrores.add("El correo no tiene un formato válido.");
                 }*/
                 if (Validaciones.isEmpty((String) data.get("contrasena"))) {
@@ -208,7 +205,8 @@ public class UsuariosController extends HttpServlet {
                 }
                 if (Validaciones.isEmpty((String) data.get("correo"))) {
                     listaErrores.add("El correo es obligatorio.");
-                } /*else if (!Validaciones.esCorreoValido((String) data.get("correo"))) {
+                }
+                /*else if (!Validaciones.esCorreoValido((String) data.get("correo"))) {
                     listaErrores.add("El correo no tiene un formato válido.");
                 }*/
                 if (data.get("id_rol") == null) {
@@ -263,30 +261,67 @@ public class UsuariosController extends HttpServlet {
         }
     }
 
-    // Nueva operación: login
     private void login(HttpServletRequest request, HttpServletResponse response) {
-        PrintWriter out = null;
+    PrintWriter out = null;
+    try {
+        response.setContentType("application/json; charset=UTF-8");
+        out = response.getWriter();
+
+        // ✅ Leer el cuerpo como JSON
+        StringBuilder sb = new StringBuilder();
+        String line;
+        try (java.io.BufferedReader reader = request.getReader()) {
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+        }
+        String jsonString = sb.toString();
+
+        if (jsonString.isEmpty()) {
+            out.print("{\"success\": false, \"message\": \"No se recibieron datos.\"}");
+            return;
+        }
+
+        JSONParser parser = new JSONParser();
+        JSONObject data = (JSONObject) parser.parse(jsonString);
+
+        String correo = (String) data.get("correo");
+        String contrasena = (String) data.get("contrasena");
+
+        Logger logger = Logger.getLogger(UsuariosController.class.getName());
+        logger.log(Level.INFO, "Correo recibido: {0}", correo);
+        logger.log(Level.INFO, "Contraseña recibida: {0}", contrasena);
+
+        // ✅ Validación
+        if (correo == null || contrasena == null || correo.trim().isEmpty() || contrasena.trim().isEmpty()) {
+            out.print("{\"success\": false, \"message\": \"Correo y contraseña son obligatorios.\"}");
+            return;
+        }
+
+        // ✅ Llamar al modelo
+        JSONObject usuario = modelo.login(correo, contrasena);
+        if (usuario != null) {
+            HttpSession session = request.getSession();
+            session.setAttribute("usuario", usuario);
+            out.print("{\"success\": true, \"message\": \"Login exitoso.\"}");
+        } else {
+            out.print("{\"success\": false, \"message\": \"Credenciales inválidas.\"}");
+        }
+    } catch (IOException | org.json.simple.parser.ParseException e) {
+        Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, "Error al procesar login", e);
         try {
-            out = response.getWriter();
-            String correo = request.getParameter("correo");
-            String contrasena = request.getParameter("contrasena");
-
-            if (Validaciones.isEmpty(correo) || Validaciones.isEmpty(contrasena)) {
-                out.print("{\"success\": false, \"message\": \"Correo y contraseña son obligatorios.\"}");
-                return;
+            if (out == null) {
+                response.setContentType("application/json; charset=UTF-8");
+                out = response.getWriter();
             }
-
-            JSONObject usuario = modelo.login(correo, contrasena);
-            if (usuario != null) {
-                HttpSession session = request.getSession();
-                session.setAttribute("usuario", usuario); // Guardar en sesión
-                out.print("{\"success\": true, \"message\": \"Login exitoso.\"}");
-            } else {
-                out.print("{\"success\": false, \"message\": \"Credenciales inválidas.\"}");
-            }
+            out.print("{\"success\": false, \"message\": \"Error interno del servidor.\"}");
         } catch (IOException ex) {
-            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, null, ex);
-            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
+            Logger.getLogger(UsuariosController.class.getName()).log(Level.SEVERE, "Error fatal", ex);
+        }
+    } finally {
+        if (out != null) {
+            out.close();
         }
     }
+}
 }

@@ -1,4 +1,5 @@
-package sv.edu.udb.www.utils;
+package utils;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -6,7 +7,6 @@ public class Validaciones {
 
     private static int entero;
     private static double decimal;
-
 
     public static boolean esEntero(String cadena) {
         try {
@@ -29,8 +29,8 @@ public class Validaciones {
         }
     }
 
-    public static boolean isEmpty(String mensaje) {
-        return mensaje.trim().equals("");
+    public static boolean isEmpty(String str) {
+        return str == null || str.trim().isEmpty();
     }
 
     public static boolean esDecimal(String cadena) {
@@ -65,13 +65,13 @@ public class Validaciones {
         Matcher mat = pat.matcher(cadena);
         return mat.matches();
     }
-    
+
     public static boolean esCodigoAutor(String cadena) {
         Pattern pat = Pattern.compile("AUT[0-9]{3}");
         Matcher mat = pat.matcher(cadena);
         return mat.matches();
     }
-    
+
     public static boolean esCodigoLibro(String cadena) {
         Pattern pat = Pattern.compile("LIB[0-9]{6}");
         Matcher mat = pat.matcher(cadena);

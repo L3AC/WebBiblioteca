@@ -18,7 +18,7 @@ import model.EjemplaresModel;
 /*import sv.edu.udb.www.model.AutoresModel;
 import sv.edu.udb.www.model.GenerosModel;
 import model.EditorialesModel;*/
-import sv.edu.udb.www.utils.Validaciones;
+import utils.Validaciones;
 
 @WebServlet(name = "EjemplaresController", urlPatterns = {"/ejemplares.do"})
 public class EjemplaresController extends HttpServlet {
