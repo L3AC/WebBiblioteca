@@ -1,10 +1,10 @@
-/*
 package controllers;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import jakarta.servlet.ServletException;
@@ -12,10 +12,16 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import sv.edu.udb.www.beans.Autor;
-import sv.edu.udb.www.model.AutoresModel;
-import sv.edu.udb.www.utils.Validaciones;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+import model.AutoresModel;
+import utils.Validaciones;
 
+/**
+ *
+ * @author TuNombre
+ */
 @WebServlet(name = "AutoresController", urlPatterns = {"/autores.do"})
 public class AutoresController extends HttpServlet {
 
@@ -26,35 +32,34 @@ public class AutoresController extends HttpServlet {
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
         try (PrintWriter out = response.getWriter()) {
-             if(request.getParameter("op")==null){
-            listar(request, response);
-            return;
+            if (request.getParameter("op") == null) {
+                listar(request, response);
+                return;
             }
+
             String operacion = request.getParameter("op");
-   
-            switch (operacion) {
-                case "listar":
-                    listar(request, response);
-                    break;
-                case "nuevo":
-                    request.getRequestDispatcher("/autores/nuevoAutor.jsp").forward(request, response);
-                    break;
-                case "insertar":
-                    insertar(request, response);
-                    break;
-                case "obtener":
-                    obtener(request, response);
-                    break;
-                case "modificar":
-                    modificar(request, response);
-                    break;
-                case "eliminar":
-                    eliminar(request, response);
-                    break;
+
+            if ("listar".equals(operacion)) {
+                listar(request, response);
+            } else if ("nuevo".equals(operacion)) {
+                nuevo(request, response);
+            } else if ("insertar".equals(operacion)) {
+                insertar(request, response);
+            } else if ("obtener".equals(operacion)) {
+                obtener(request, response);
+            } else if ("modificar".equals(operacion)) {
+                modificar(request, response);
+            } else if ("eliminar".equals(operacion)) {
+                eliminar(request, response);
+            } else if ("detalles".equals(operacion)) {
+                detalles(request, response);
+            } else {
+                request.getRequestDispatcher("/error404.jsp").forward(request, response);
             }
         }
     }
 
+    // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -74,119 +79,152 @@ public class AutoresController extends HttpServlet {
 
     private void listar(HttpServletRequest request, HttpServletResponse response) {
         try {
-            request.setAttribute("listaAutores", modelo.listarAutores());
+            List<JSONObject> lista = modelo.listarAutores();
+            request.setAttribute("listaAutores", lista);
             request.getRequestDispatcher("/autores/listaAutores.jsp").forward(request, response);
-        } catch (SQLException | ServletException | IOException ex) {
+        } catch (ServletException | IOException ex) {
+            Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    private void nuevo(HttpServletRequest request, HttpServletResponse response) {
+        try {
+            request.getRequestDispatcher("/autores/nuevoAutor.jsp").forward(request, response);
+        } catch (ServletException | IOException ex) {
             Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     private void insertar(HttpServletRequest request, HttpServletResponse response) {
+        PrintWriter out = null;
         try {
+            out = response.getWriter();
             listaErrores.clear();
-            Autor miAutor = new Autor();
-            miAutor.setCodigoAutor(request.getParameter("codigo"));
-            miAutor.setNombreAutor(request.getParameter("nombre"));
-            miAutor.setNacionalidad(request.getParameter("nacionalidad"));
 
-            if (Validaciones.isEmpty(miAutor.getCodigoAutor())) {
-                listaErrores.add("El codigo del autor es obligatorio");
-            } else if (!Validaciones.esCodigoAutor(miAutor.getCodigoAutor())) {
-                listaErrores.add("El codigo de la autor debe tener el formato correcto AUT000");
-            }
-            if (Validaciones.isEmpty(miAutor.getNombreAutor())) {
-                listaErrores.add("El nombre del autor es obligatorio");
-            }
-
-            if (Validaciones.isEmpty(miAutor.getNacionalidad())) {
-                listaErrores.add("La nacionalidad es obligatoria");
-            }
-
-            if (listaErrores.size() > 0) {
-                request.setAttribute("listaErrores", listaErrores);
-                request.setAttribute("autor", miAutor);
-                request.getRequestDispatcher("autores.do?op=nuevo").forward(request, response);
-            } else {
-                if (modelo.insertarAutor(miAutor) > 0) {
-                    request.getSession().setAttribute("exito", "autor registrado exitosamente");
-                    response.sendRedirect(request.getContextPath() + "/autores.do?op=listar");
-                } else {
-                    request.getSession().setAttribute("fracaso", "El autor no ha sido ingresado" + "ya hay un autor con este codigo");
-                    response.sendRedirect(request.getContextPath() + "/autores.do?op=listar");
+            StringBuilder sb = new StringBuilder();
+            String line;
+            try (java.io.BufferedReader reader = request.getReader()) {
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
                 }
             }
-        } catch (IOException | SQLException | ServletException ex) {
+            String jsonString = sb.toString();
+
+            if (jsonString.isEmpty()) {
+                listaErrores.add("No se recibió información para registrar el autor.");
+            } else {
+                JSONParser parser = new JSONParser();
+                JSONObject data = (JSONObject) parser.parse(jsonString);
+
+                // Validaciones
+                if (Validaciones.isEmpty((String) data.get("nombre_autor"))) {
+                    listaErrores.add("El nombre del autor es obligatorio.");
+                }
+
+                if (listaErrores.isEmpty()) {
+                    boolean ok = modelo.registrarAutor(data);
+                    if (ok) {
+                        request.getSession().setAttribute("exito", "Autor registrado exitosamente.");
+                        out.print("{\"success\": true, \"message\": \"Autor registrado exitosamente.\"}");
+                    } else {
+                        out.print("{\"success\": false, \"message\": \"No se pudo registrar el autor (posible duplicado).\"}");
+                    }
+                } else {
+                    out.print("{\"success\": false, \"errors\": " + listaErrores.toString() + "}");
+                }
+            }
+        } catch (IOException | ParseException ex) {
             Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
+            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
         }
     }
 
     private void obtener(HttpServletRequest request, HttpServletResponse response) {
         try {
-            String codigo = request.getParameter("id");
-            Autor miAutor = modelo.obtenerAutor(codigo);
-            if (miAutor != null) {
-                request.setAttribute("autor", miAutor);
+            int id = Integer.parseInt(request.getParameter("id"));
+            JSONObject autor = modelo.obtenerPorId(id);
+            if (autor != null) {
+                request.setAttribute("autor", autor);
                 request.getRequestDispatcher("/autores/editarAutor.jsp").forward(request, response);
             } else {
                 response.sendRedirect(request.getContextPath() + "/error404.jsp");
             }
-        } catch (SQLException | IOException | ServletException ex) {
+        } catch (ServletException | IOException ex) {
             Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     private void modificar(HttpServletRequest request, HttpServletResponse response) {
+        PrintWriter out = null;
         try {
+            out = response.getWriter();
             listaErrores.clear();
-            Autor miAutor = new Autor();
-            miAutor.setCodigoAutor(request.getParameter("codigo"));
-            miAutor.setNombreAutor(request.getParameter("nombre"));
-            miAutor.setNacionalidad(request.getParameter("nacionalidad"));
 
-            if (Validaciones.isEmpty(miAutor.getCodigoAutor())) {
-                listaErrores.add("El codigo del autor es obligatorio");
-            } else if (!Validaciones.esCodigoAutor(miAutor.getCodigoAutor())) {
-                listaErrores.add("El codigo de la autor debe tener el formato correcto AUT000");
-            }
-            if (Validaciones.isEmpty(miAutor.getNombreAutor())) {
-                listaErrores.add("El nombre del autor es obligatorio");
-            }
-
-            if (Validaciones.isEmpty(miAutor.getNacionalidad())) {
-                listaErrores.add("La nacionalidad es obligatoria");
-            }
-
-            if (listaErrores.size() > 0) {
-                request.setAttribute("listaErrores", listaErrores);
-                request.setAttribute("autor", miAutor);
-                request.getRequestDispatcher("autores.do?op=obtener").forward(request, response);
-            } else {
-                if (modelo.modificarAutor(miAutor) > 0) {
-                    request.getSession().setAttribute("exito", "autor modificado exitosamente");
-                    response.sendRedirect(request.getContextPath() + "/autores.do?op=listar");
-                } else {
-                    request.getSession().setAttribute("fracaso", "El autor no ha sido modificado" + "ya hay un autor con este codigo");
-                    response.sendRedirect(request.getContextPath() + "/autores.do?op=listar");
+            StringBuilder sb = new StringBuilder();
+            String line;
+            try (java.io.BufferedReader reader = request.getReader()) {
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
                 }
             }
-        } catch (IOException | SQLException | ServletException ex) {
+            String jsonString = sb.toString();
+
+            if (jsonString.isEmpty()) {
+                listaErrores.add("No se recibió información para modificar el autor.");
+            } else {
+                JSONParser parser = new JSONParser();
+                JSONObject data = (JSONObject) parser.parse(jsonString);
+
+                // Validaciones
+                if (Validaciones.isEmpty((String) data.get("nombre_autor"))) {
+                    listaErrores.add("El nombre del autor es obligatorio.");
+                }
+
+                if (listaErrores.isEmpty()) {
+                    boolean ok = modelo.actualizarAutor(data);
+                    if (ok) {
+                        request.getSession().setAttribute("exito", "Autor modificado exitosamente.");
+                        out.print("{\"success\": true, \"message\": \"Autor modificado exitosamente.\"}");
+                    } else {
+                        out.print("{\"success\": false, \"message\": \"No se pudo modificar el autor.\"}");
+                    }
+                } else {
+                    out.print("{\"success\": false, \"errors\": " + listaErrores.toString() + "}");
+                }
+            }
+        } catch (IOException | ParseException ex) {
             Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
+            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
         }
     }
 
     private void eliminar(HttpServletRequest request, HttpServletResponse response) {
         try {
-            String codigo = request.getParameter("id");
-            if (modelo.eliminarAutor(codigo) > 0) {
-                request.setAttribute("exito", "Autor eliminado exitosamente");
-                
+            int id = Integer.parseInt(request.getParameter("id"));
+            boolean ok = modelo.eliminarAutor(id);
+            if (ok) {
+                request.setAttribute("exito", "Autor eliminado exitosamente.");
             } else {
-                request.setAttribute("fracaso", "No se puede eliminar este autor");
+                request.setAttribute("fracaso", "No se puede eliminar este autor.");
             }
             request.getRequestDispatcher("/autores.do?op=listar").forward(request, response);
-        } catch (SQLException | ServletException | IOException ex) {
+        } catch (ServletException | IOException ex) {
             Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
-}*/
+    private void detalles(HttpServletRequest request, HttpServletResponse response) {
+        try {
+            PrintWriter out = response.getWriter();
+            int id = Integer.parseInt(request.getParameter("id"));
+            JSONObject autor = modelo.obtenerPorId(id);
+            if (autor != null) {
+                out.print(autor.toJSONString());
+            } else {
+                out.print("{\"error\": \"Autor no encontrado\"}");
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+}

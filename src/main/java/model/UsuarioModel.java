@@ -19,7 +19,7 @@ public class UsuarioModel extends Conexion {
                r.id_rol, r.nombre_rol, r.cant_max_prestamo, r.dias_prestamo, r.mora_diaria
         FROM Usuarios u
         JOIN Roles r ON u.id_rol = r.id_rol
-        WHERE u.correo = ?
+        WHERE u.correo = ? 
         """;
 
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -157,6 +157,7 @@ public class UsuarioModel extends Conexion {
                    r.id_rol, r.nombre_rol, r.cant_max_prestamo, r.dias_prestamo, r.mora_diaria
             FROM Usuarios u
             JOIN Roles r ON u.id_rol = r.id_rol
+            where u.id_rol>1
             ORDER BY u.id_usuario
             """;
 
@@ -188,13 +189,27 @@ public class UsuarioModel extends Conexion {
 
     // === ACTUALIZAR USUARIO (con contraseña opcional) ===
     public boolean actualizarUsuario(JSONObject data) {
-        int idUsuario = ((Long) data.get("id_usuario")).intValue();
+        System.out.println(">>> INICIANDO ACTUALIZAR USUARIO <<<");
+        Long idUsuarioLong = (Long) data.get("id_usuario");
+        if (idUsuarioLong == null) {
+            System.out.println(">>> id_usuario es null <<<");
+            return false;
+        }
+        int idUsuario = idUsuarioLong.intValue();
         String correo = (String) data.get("correo");
 
+        System.out.println(">>> Actualizando usuario ID: " + idUsuario + ", Correo: " + correo);
+
+        // ✅ Validar que el nuevo correo no esté usado por otro usuario
+        if (correoYaUsadoPorOtro(idUsuario, correo)) {
+            System.out.println(">>> Actualización cancelada: correo duplicado: " + correo);
+            return false;
+        }
+
         StringBuilder sql = new StringBuilder("""
-        UPDATE Usuarios
-        SET nombre = ?, apellido = ?, correo = ?
-        """);
+    UPDATE Usuarios
+    SET nombre = ?, apellido = ?, correo = ?, id_rol=?
+    """);
         String nuevaContrasena = (String) data.get("contrasena");
         boolean actualizarPassword = nuevaContrasena != null && !nuevaContrasena.isBlank();
         if (actualizarPassword) {
@@ -202,20 +217,13 @@ public class UsuarioModel extends Conexion {
         }
         sql.append(" WHERE id_usuario = ?");
 
-        if (existeCorreo(correo)) {
-            JSONObject existente = obtenerPorCorreo(correo);
-            if (existente != null && !existente.get("id_usuario").equals((long) idUsuario)) {
-                Logger.getLogger(UsuarioModel.class.getName()).log(Level.WARNING, "Actualización cancelada: correo duplicado: {0}", correo);
-                return false;
-            }
-        }
-
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql.toString())) {
 
             int idx = 1;
             ps.setString(idx++, (String) data.get("nombre"));
             ps.setString(idx++, (String) data.get("apellido"));
             ps.setString(idx++, correo);
+            ps.setInt(idx++, ((Long) data.get("id_rol")).intValue()); // ✅ Asegurar que sea int
 
             if (actualizarPassword) {
                 String hash = BCrypt.hashpw(nuevaContrasena, BCrypt.gensalt());
@@ -223,24 +231,38 @@ public class UsuarioModel extends Conexion {
             }
 
             ps.setInt(idx, idUsuario);
-            return ps.executeUpdate() > 0;
+
+            System.out.println(">>> Ejecutando SQL: " + sql.toString());
+            System.out.println(">>> Parámetros: " + idUsuario + ", " + correo);
+
+            int filas = ps.executeUpdate();
+            System.out.println(">>> Filas afectadas: " + filas);
+
+            return filas > 0;
 
         } catch (SQLException e) {
-            Logger.getLogger(UsuarioModel.class.getName()).log(Level.SEVERE, "Error al actualizar usuario ID: " + idUsuario, e);
+            System.out.println(">>> Error SQL: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
 
-    // === ELIMINAR USUARIO ===
-    public boolean eliminarUsuario(int idUsuario) {
-        String sql = "DELETE FROM Usuarios WHERE id_usuario = ?";
+// ✅ Nuevo método: Verifica si el correo ya está usado por otro usuario
+    private boolean correoYaUsadoPorOtro(int idUsuario, String correo) {
+        String sql = "SELECT id_usuario FROM Usuarios WHERE correo = ?";
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idUsuario);
-            return ps.executeUpdate() > 0;
+            ps.setString(1, correo);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int idExistente = rs.getInt("id_usuario");
+                    // ✅ Si el correo ya existe, pero es del mismo usuario, está permitido
+                    return idExistente != idUsuario;
+                }
+            }
         } catch (SQLException e) {
-            Logger.getLogger(UsuarioModel.class.getName()).log(Level.SEVERE, "Error al eliminar usuario con ID: " + idUsuario, e);
-            return false;
+            Logger.getLogger(UsuarioModel.class.getName()).log(Level.SEVERE, "Error al verificar duplicado de correo", e);
         }
+        return false;
     }
 
     // === OBTENER USUARIO POR CORREO (como JSON) ===
@@ -280,4 +302,17 @@ public class UsuarioModel extends Conexion {
         }
         return null;
     }
+
+    // === ELIMINAR USUARIO ===
+    public boolean eliminarUsuario(int idUsuario) {
+        String sql = "DELETE FROM Usuarios WHERE id_usuario = ?";
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idUsuario);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            Logger.getLogger(UsuarioModel.class.getName()).log(Level.SEVERE, "Error al eliminar usuario con ID: " + idUsuario, e);
+            return false;
+        }
+    }
+
 }

@@ -1,10 +1,10 @@
-/*
-package sv.edu.udb.www.controllers;
+package controllers;
 
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import jakarta.servlet.ServletException;
@@ -12,51 +12,50 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import sv.edu.udb.www.beans.Autor;
-import sv.edu.udb.www.beans.Genero;
-import sv.edu.udb.www.model.GenerosModel;
-import sv.edu.udb.www.utils.Validaciones;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+import model.GenerosModel;
+import utils.Validaciones;
 
 @WebServlet(name = "GenerosController", urlPatterns = {"/generos.do"})
 public class GenerosController extends HttpServlet {
-    
-    GenerosModel modelo = new GenerosModel();
+
     ArrayList<String> listaErrores = new ArrayList<>();
-    
+    GenerosModel modelo = new GenerosModel();
+
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
         try (PrintWriter out = response.getWriter()) {
-            if(request.getParameter("op")==null){
-            listar(request, response);
-            return;
+            if (request.getParameter("op") == null) {
+                listar(request, response);
+                return;
             }
+
             String operacion = request.getParameter("op");
-   
-            switch (operacion) {
-                case "listar":
-                    listar(request, response);
-                    break;
-                case "nuevo":
-                    request.getRequestDispatcher("/generos/nuevoGenero.jsp").forward(request, response);
-                    break;
-                case "insertar":
-                    insertar(request, response);
-                    break;
-                case "obtener":
-                    obtener(request, response);
-                    break;
-                case "modificar":
-                    modificar(request, response);
-                    break;
-                case "eliminar":
-                    eliminar(request, response);
-                    break;
+
+            if ("listar".equals(operacion)) {
+                listar(request, response);
+            } else if ("nuevo".equals(operacion)) {
+                nuevo(request, response);
+            } else if ("insertar".equals(operacion)) {
+                insertar(request, response);
+            } else if ("obtener".equals(operacion)) {
+                obtener(request, response);
+            } else if ("modificar".equals(operacion)) {
+                modificar(request, response);
+            } else if ("eliminar".equals(operacion)) {
+                eliminar(request, response);
+            } else if ("detalles".equals(operacion)) {
+                detalles(request, response);
+            } else {
+                request.getRequestDispatcher("/error404.jsp").forward(request, response);
             }
         }
     }
 
-
+    // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -76,109 +75,152 @@ public class GenerosController extends HttpServlet {
 
     private void listar(HttpServletRequest request, HttpServletResponse response) {
         try {
-            request.setAttribute("listaGeneros", modelo.listarGeneros());
+            List<JSONObject> lista = modelo.listarGeneros();
+            request.setAttribute("listaGeneros", lista);
             request.getRequestDispatcher("/generos/listaGeneros.jsp").forward(request, response);
-        } catch (ServletException | IOException | SQLException ex) {
+        } catch (ServletException | IOException ex) {
+            Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    private void nuevo(HttpServletRequest request, HttpServletResponse response) {
+        try {
+            request.getRequestDispatcher("/generos/nuevoGenero.jsp").forward(request, response);
+        } catch (ServletException | IOException ex) {
             Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     private void insertar(HttpServletRequest request, HttpServletResponse response) {
-      try {
+        PrintWriter out = null;
+        try {
+            out = response.getWriter();
             listaErrores.clear();
-            Genero miGenero = new Genero();
-            miGenero.setNombreGenero(request.getParameter("nombre"));
-            miGenero.setDescripcion(request.getParameter("descripcion"));
-           
 
-            if (Validaciones.isEmpty(miGenero.getNombreGenero())) {
-                listaErrores.add("El nombre del genero es obligatorio");
-            }
-
-            if (listaErrores.size() > 0) {
-                request.setAttribute("listaErrores", listaErrores);
-                request.setAttribute("autor", miGenero);
-                request.getRequestDispatcher("generos.do?op=nuevo").forward(request, response);
-            } else {
-                if (modelo.insertarGeneros(miGenero) > 0) {
-                    request.getSession().setAttribute("exito", "genero registrado exitosamente");
-                    response.sendRedirect(request.getContextPath() + "/generos.do?op=listar");
-                } else {
-                    request.getSession().setAttribute("fracaso", "El genero no ha sido ingresado");
-                    response.sendRedirect(request.getContextPath() + "/generos.do?op=listar");
+            StringBuilder sb = new StringBuilder();
+            String line;
+            try (java.io.BufferedReader reader = request.getReader()) {
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
                 }
             }
-        } catch (IOException ex) {
-            Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (SQLException ex) {
-            Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ServletException ex) {
-            Logger.getLogger(AutoresController.class.getName()).log(Level.SEVERE, null, ex);
+            String jsonString = sb.toString();
+
+            if (jsonString.isEmpty()) {
+                listaErrores.add("No se recibió información para registrar el género.");
+            } else {
+                JSONParser parser = new JSONParser();
+                JSONObject data = (JSONObject) parser.parse(jsonString);
+
+                // Validaciones
+                if (Validaciones.isEmpty((String) data.get("nombre_genero"))) {
+                    listaErrores.add("El nombre del género es obligatorio.");
+                }
+
+                if (listaErrores.isEmpty()) {
+                    boolean ok = modelo.registrarGenero(data);
+                    if (ok) {
+                        request.getSession().setAttribute("exito", "Género registrado exitosamente.");
+                        out.print("{\"success\": true, \"message\": \"Género registrado exitosamente.\"}");
+                    } else {
+                        out.print("{\"success\": false, \"message\": \"No se pudo registrar el género (posible duplicado).\"}");
+                    }
+                } else {
+                    out.print("{\"success\": false, \"errors\": " + listaErrores.toString() + "}");
+                }
+            }
+        } catch (IOException | ParseException ex) {
+            Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
+            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
         }
     }
 
     private void obtener(HttpServletRequest request, HttpServletResponse response) {
         try {
-            String id = request.getParameter("id");
-            Genero miGenero = modelo.obtenerGenero(id);
-            if (miGenero != null) {
-                request.setAttribute("genero", miGenero);
-                request.getRequestDispatcher("/generos/editarGeneros.jsp").forward(request, response);
+            int id = Integer.parseInt(request.getParameter("id"));
+            JSONObject genero = modelo.obtenerPorId(id);
+            if (genero != null) {
+                request.setAttribute("genero", genero);
+                request.getRequestDispatcher("/generos/editarGenero.jsp").forward(request, response);
             } else {
                 response.sendRedirect(request.getContextPath() + "/error404.jsp");
             }
-        } catch (SQLException | ServletException | IOException ex) {
+        } catch (ServletException | IOException ex) {
             Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
     private void modificar(HttpServletRequest request, HttpServletResponse response) {
+        PrintWriter out = null;
         try {
+            out = response.getWriter();
             listaErrores.clear();
-            Genero miGenero = new Genero();
-            miGenero.setNombreGenero(request.getParameter("nombre"));
-            miGenero.setDescripcion(request.getParameter("descripcion"));
-            miGenero.setIdGenero(Integer.parseInt(request.getParameter("id2")));
 
-            if (Validaciones.isEmpty(miGenero.getNombreGenero())) {
-                listaErrores.add("El nombre del genero es obligatorio");
-            }
-
-            if (listaErrores.size() > 0) {
-                request.setAttribute("listaErrores", listaErrores);
-                request.setAttribute("autor", miGenero);
-                request.getRequestDispatcher("generos.do?op=nuevo").forward(request, response);
-            } else {
-                if (modelo.modificarGenero(miGenero) > 0) {
-                    request.getSession().setAttribute("exito", "genero registrado exitosamente");
-                    response.sendRedirect(request.getContextPath() + "/generos.do?op=listar");
-                } else {
-                    request.getSession().setAttribute("fracaso", "El genero no ha sido ingresado");
-                    response.sendRedirect(request.getContextPath() + "/generos.do?op=listar");
+            StringBuilder sb = new StringBuilder();
+            String line;
+            try (java.io.BufferedReader reader = request.getReader()) {
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
                 }
             }
-        } catch (IOException ex) {
+            String jsonString = sb.toString();
+
+            if (jsonString.isEmpty()) {
+                listaErrores.add("No se recibió información para modificar el género.");
+            } else {
+                JSONParser parser = new JSONParser();
+                JSONObject data = (JSONObject) parser.parse(jsonString);
+
+                // Validaciones
+                if (Validaciones.isEmpty((String) data.get("nombre_genero"))) {
+                    listaErrores.add("El nombre del género es obligatorio.");
+                }
+
+                if (listaErrores.isEmpty()) {
+                    boolean ok = modelo.actualizarGenero(data);
+                    if (ok) {
+                        request.getSession().setAttribute("exito", "Género modificado exitosamente.");
+                        out.print("{\"success\": true, \"message\": \"Género modificado exitosamente.\"}");
+                    } else {
+                        out.print("{\"success\": false, \"message\": \"No se pudo modificar el género.\"}");
+                    }
+                } else {
+                    out.print("{\"success\": false, \"errors\": " + listaErrores.toString() + "}");
+                }
+            }
+        } catch (IOException | ParseException ex) {
             Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (SQLException ex) {
-            Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (ServletException ex) {
-            Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
+            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
         }
     }
 
     private void eliminar(HttpServletRequest request, HttpServletResponse response) {
-       try {
-            String id = request.getParameter("id");
-            if (modelo.eliminarGenero(id) > 0) {
-                request.setAttribute("exito", "genero eliminado exitosamente");
-                
+        try {
+            int id = Integer.parseInt(request.getParameter("id"));
+            boolean ok = modelo.eliminarGenero(id);
+            if (ok) {
+                request.setAttribute("exito", "Género eliminado exitosamente.");
             } else {
-                request.setAttribute("fracaso", "No se puede eliminar este genero");
+                request.setAttribute("fracaso", "No se puede eliminar este género.");
             }
             request.getRequestDispatcher("/generos.do?op=listar").forward(request, response);
-        } catch (SQLException | ServletException | IOException ex) {
+        } catch (ServletException | IOException ex) {
             Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
-        }  
+        }
     }
 
-}*/
+    private void detalles(HttpServletRequest request, HttpServletResponse response) {
+        try {
+            PrintWriter out = response.getWriter();
+            int id = Integer.parseInt(request.getParameter("id"));
+            JSONObject genero = modelo.obtenerPorId(id);
+            if (genero != null) {
+                out.print(genero.toJSONString());
+            } else {
+                out.print("{\"error\": \"Género no encontrado\"}");
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(GenerosController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+}

@@ -1,28 +1,45 @@
+
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<%@page contentType="text/html" pageEncoding="UTF-8"%>
+<%@ include file="../header.jsp" %> <!-- ? ESTE ES EL HEADER DINÁMICO -->
+
 <!DOCTYPE html>
 <html>
 <head>
     <title>Nuevo Usuario</title>
-    <%@ include file='/cabecera.jsp' %>
 </head>
 <body>
-    <jsp:include page="/menu.jsp"/>
     <div class="container">
         <div class="row">
             <h3>Nuevo Usuario</h3>
         </div>
+        
+        <!-- ? Mensajes de éxito/error -->
+        <c:if test="${not empty exito}">
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <strong>? Éxito:</strong> ${exito}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </c:if>
+        <c:if test="${not empty fracaso}">
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>? Error:</strong> ${fracaso}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </c:if>
+        <c:if test="${not empty listaErrores}">
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>?? Errores de validación:</strong>
+                <ul class="mb-0">
+                    <c:forEach var="error" items="${requestScope.listaErrores}">
+                        <li>${error}</li>
+                    </c:forEach>
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </c:if>
+
         <div class="row">
             <div class="col-md-7">
-                <c:if test="${not empty listaErrores}">
-                    <div class="alert alert-danger">
-                        <ul>
-                            <c:forEach var="error" items="${requestScope.listaErrores}">
-                                <li>${error}</li>
-                            </c:forEach>
-                        </ul>
-                    </div>
-                </c:if>
                 <form id="usuarioForm" role="form" action="${contextPath}/usuarios.do" method="POST">
                     <input type="hidden" name="op" value="insertar">
                     <div class="well well-sm">
@@ -50,9 +67,9 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="contrasena">ContraseÃ±a</label>
+                        <label for="contrasena">Contraseña</label>
                         <div class="input-group">
-                            <input type="password" class="form-control" name="contrasena" id="contrasena" placeholder="Ingresa la contraseÃ±a" required>
+                            <input type="password" class="form-control" name="contrasena" id="contrasena" placeholder="Ingresa la contraseña" required>
                             <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
                         </div>
                     </div>
@@ -73,37 +90,14 @@
     </div>
 
     <script>
-        document.getElementById('usuarioForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const formData = new FormData(this);
-            const data = Object.fromEntries(formData.entries());
-
-            fetch('${contextPath}/usuarios.do?op=insertar', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    alertify.success(result.message);
-                    window.location.href = '${contextPath}/usuarios.do?op=listar';
-                } else {
-                    if (result.errors) {
-                        alertify.error(result.errors.join('<br>'));
-                    } else {
-                        alertify.error(result.message);
-                    }
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alertify.error('Error de conexiÃ³n.');
+        // ? Opcional: Auto-cerrar alertas después de 5 segundos
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
             });
-        });
+        }, 5000);
     </script>
 </body>
 </html>
