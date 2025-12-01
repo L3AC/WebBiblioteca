@@ -122,8 +122,9 @@
                             <li><a href="${contextPath}/prestamos.jsp?accion=devolucion">Devolución</a></li>
                         </ul>
                     </li>
-                    <li><a href="${contextPath}/usuarios.jsp">Usuarios</a></li>
-                    <li><a href="${contextPath}/roles.jsp">Roles</a></li>
+                    <!-- ✅ CAMBIADO: Ahora va al servlet para cargar datos -->
+                    <li><a href="${contextPath}/usuarios.do?op=listar">Usuarios</a></li>
+                    <li><a href="${contextPath}/roles.do?op=listar">Roles</a></li>
                     <li><a href="${contextPath}/logout" onclick="return confirm('¿Estás seguro de cerrar sesión?');">LogOut</a></li>
                 </c:if>
 
