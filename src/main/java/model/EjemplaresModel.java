@@ -1,6 +1,8 @@
 package model;
 
 import java.sql.*;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.json.simple.JSONObject;
@@ -158,6 +160,37 @@ public class EjemplaresModel extends Conexion {
                 }
             }
         }
+    }
+
+    // === LISTAR TODOS LOS EJEMPLARES (como lista de JSON) ===
+    public List<JSONObject> listarEjemplares() {
+        List<JSONObject> lista = new ArrayList<>();
+        String sql = """
+            SELECT e.id_ejemplar, e.titulo, e.tipo_documento, e.ubicacion, a.nombre_autor
+            FROM Ejemplares e
+            LEFT JOIN Autores a ON e.id_autor = a.id_autor
+            ORDER BY e.id_ejemplar
+            """;
+
+        try (Connection conn = getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                JSONObject ejemplar = new JSONObject();
+                ejemplar.put("id_ejemplar", rs.getInt("id_ejemplar"));
+                ejemplar.put("titulo", rs.getString("titulo"));
+                ejemplar.put("tipo_documento", rs.getString("tipo_documento"));
+                ejemplar.put("ubicacion", rs.getString("ubicacion"));
+                ejemplar.put("nombre_autor", rs.getString("nombre_autor")); // Puede ser null si no hay autor
+
+                lista.add(ejemplar);
+            }
+
+        } catch (SQLException e) {
+            Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al listar ejemplares", e);
+        }
+        return lista;
     }
 
     // ------------------ Helpers ------------------

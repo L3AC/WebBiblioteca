@@ -11,6 +11,7 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -25,6 +26,7 @@ public class EjemplaresController extends HttpServlet {
 
     ArrayList<String> listaErrores = new ArrayList<>();
     EjemplaresModel modelo = new EjemplaresModel();
+
     /*AutoresModel autores = new AutoresModel();
     GenerosModel generos = new GenerosModel();
     EditorialesModel editoriales = new EditorialesModel();*/
@@ -82,10 +84,13 @@ public class EjemplaresController extends HttpServlet {
 
     private void listar(HttpServletRequest request, HttpServletResponse response) {
         try {
-            // Aquí puedes usar una vista JSP que muestre la lista de ejemplares
+            // Aquí debes usar tu modelo para obtener la lista
+            List<JSONObject> lista = modelo.listarEjemplares(); // Asumiendo que tienes este método
+            request.setAttribute("listaEjemplares", lista);
             request.getRequestDispatcher("/ejemplares/listaEjemplares.jsp").forward(request, response);
-        } catch (ServletException | IOException ex) {
+        } catch (Exception ex) {
             Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, null, ex);
+            // Manejar error
         }
     }
 
