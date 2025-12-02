@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.json.simple.JSONObject;
-import static utils.ConexionBD.getConnection;  
+import static utils.ConexionBD.getConnection;
 
 public class EjemplaresModel extends Conexion {
 
@@ -18,11 +18,11 @@ public class EjemplaresModel extends Conexion {
 
             // --- 1. Extraer datos generales del ejemplar ---
             String titulo = (String) data.get("titulo");
-            Long idAutorLong = (Long) data.get("id_autor");
+            Long idAutorLong = obtenerLong(data, "id_autor"); // Usar obtenerLong para consistencia
             Integer idAutor = idAutorLong != null ? idAutorLong.intValue() : null;
             String ubicacion = (String) data.get("ubicacion");
             String tipoDocumento = (String) data.get("tipo_documento");
-            Long cantCopiasLong = (Long) data.get("cantidad_copias");
+            Long cantCopiasLong = obtenerLong(data, "cantidad_copias");
             int cantidadCopias = cantCopiasLong != null ? cantCopiasLong.intValue() : 0;
 
             // Insertar en Ejemplares
@@ -57,25 +57,53 @@ public class EjemplaresModel extends Conexion {
                 try {
                     conn.rollback();
                 } catch (SQLException ex) {
+                    System.err.println("Error al hacer rollback en registrarEjemplarDesdeJSON(JSONObject): " + ex.getMessage());
                     Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error en rollback", ex);
                 }
             }
+            System.err.println("Error al registrar ejemplar desde JSON (JSONObject): " + e.getMessage());
+            e.printStackTrace();
             Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al registrar ejemplar desde JSON", e);
             return false;
         } finally {
+            // Manejar el cierre de la conexión con más cuidado
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
+                } catch (SQLException e) {
+                    System.err.println("Error al restaurar auto-commit en registrarEjemplarDesdeJSON(JSONObject): " + e.getMessage());
+                    Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al restaurar auto-commit", e);
+                }
+                try {
                     conn.close();
                 } catch (SQLException e) {
+                    System.err.println("Error al cerrar conexión en registrarEjemplarDesdeJSON(JSONObject): " + e.getMessage());
                     Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al cerrar conexión", e);
+                    // IMPORTANTE: No se devuelve false aquí
                 }
             }
         }
     }
 
-    // Método para editar un ejemplar existente (sin tocar copias)
-    public boolean editarEjemplarDesdeJSON(int idEjemplar, JSONObject data) {
+    // Método para editar un ejemplar existente (actualizado para manejar subtablas correctamente)
+    // Método para editar un ejemplar existente con parámetros ya validados
+// Método para editar un ejemplar existente con parámetros ya validados
+    public boolean editarEjemplarDesdeJSON(
+            int idEjemplar,
+            JSONObject data,
+            Long idAutor,
+            Long idEditorial,
+            Long idGenero,
+            Long idTipoDetalle,
+            Long idTipoPeriodico,
+            Long idTipoRevista,
+            Long idTipoCinta,
+            Long edicion,
+            Long volumen,
+            Long duracion,
+            Long anio,
+            Long numero
+    ) {
         Connection conn = null;
         try {
             conn = getConnection();
@@ -83,28 +111,41 @@ public class EjemplaresModel extends Conexion {
 
             // --- 1. Actualizar datos generales del ejemplar ---
             String titulo = (String) data.get("titulo");
-            Long idAutorLong = (Long) data.get("id_autor");
-            Integer idAutor = idAutorLong != null ? idAutorLong.intValue() : null;
             String ubicacion = (String) data.get("ubicacion");
             String tipoDocumento = (String) data.get("tipo_documento");
 
             String sqlEjemplar = "UPDATE Ejemplares SET titulo = ?, id_autor = ?, ubicacion = ?, tipo_documento = ? WHERE id_ejemplar = ?";
-            PreparedStatement psEjemplar = conn.prepareStatement(sqlEjemplar);
-            psEjemplar.setString(1, titulo);
-            psEjemplar.setObject(2, idAutor);
-            psEjemplar.setString(3, ubicacion);
-            psEjemplar.setString(4, tipoDocumento);
-            psEjemplar.setInt(5, idEjemplar);
-            int filas = psEjemplar.executeUpdate();
-            psEjemplar.close();
+            try (PreparedStatement psEjemplar = conn.prepareStatement(sqlEjemplar)) {
+                psEjemplar.setString(1, titulo);
+                psEjemplar.setLong(2, idAutor); // Ya validado como Long
+                psEjemplar.setString(3, ubicacion);
+                psEjemplar.setString(4, tipoDocumento);
+                psEjemplar.setInt(5, idEjemplar);
+                int filas = psEjemplar.executeUpdate();
 
-            if (filas == 0) {
-                throw new SQLException("No se encontró el ejemplar con ID: " + idEjemplar);
+                if (filas == 0) {
+                    throw new SQLException("No se encontró el ejemplar con ID: " + idEjemplar);
+                }
             }
 
-            // --- 2. Eliminar registro de tipo específico y volver a insertar ---
-            eliminarSubtipo(conn, tipoDocumento, idEjemplar);
-            insertarSubtipoDesdeJSON(conn, tipoDocumento, idEjemplar, data);
+            // --- 2. Actualizar datos específicos según tipo de documento ---
+            // Dado que asumimos que el tipo_documento NO cambia, simplemente actualizamos el registro existente
+            actualizarSubtipoDesdeJSON(
+                    conn,
+                    tipoDocumento,
+                    idEjemplar,
+                    idEditorial,
+                    idGenero,
+                    idTipoDetalle,
+                    idTipoPeriodico,
+                    idTipoRevista,
+                    idTipoCinta,
+                    edicion,
+                    volumen,
+                    duracion,
+                    anio,
+                    numero
+            );
 
             conn.commit();
             return true;
@@ -114,18 +155,583 @@ public class EjemplaresModel extends Conexion {
                 try {
                     conn.rollback();
                 } catch (SQLException ex) {
+                    System.err.println("Error al hacer rollback en editarEjemplarDesdeJSON(Long params): " + ex.getMessage());
                     Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error en rollback", ex);
                 }
             }
+            System.err.println("Error al editar ejemplar desde JSON (Long params): " + e.getMessage());
+            e.printStackTrace();
             Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al editar ejemplar desde JSON", e);
             return false;
         } finally {
+            // Manejar el cierre de la conexión con más cuidado
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
+                } catch (SQLException e) {
+                    System.err.println("Error al restaurar auto-commit en editarEjemplarDesdeJSON(Long params): " + e.getMessage());
+                    Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al restaurar auto-commit", e);
+                }
+                try {
                     conn.close();
                 } catch (SQLException e) {
+                    System.err.println("Error al cerrar conexión en editarEjemplarDesdeJSON(Long params): " + e.getMessage());
                     Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al cerrar conexión", e);
+                    // IMPORTANTE: No se devuelve false aquí
+                }
+            }
+        }
+    }
+    
+    // Nuevo método para actualizar datos específicos en la subtabla correcta
+private void actualizarSubtipoDesdeJSON(
+        Connection conn,
+        String tipoDocumento,
+        int idEjemplar,
+        Long idEditorial,
+        Long idGenero,
+        Long idTipoDetalle,
+        Long idTipoPeriodico,
+        Long idTipoRevista,
+        Long idTipoCinta,
+        Long edicion,
+        Long volumen,
+        Long duracion,
+        Long anio,
+        Long numero
+) throws SQLException {
+    if ("Libro".equals(tipoDocumento)) {
+        String sql = "UPDATE Libros SET isbn = ?, id_editorial = ?, id_genero = ?, edicion = ? WHERE id_ejemplar = ?";
+        // Obtenemos el ISBN del JSON si es necesario, o lo dejamos como estaba
+        // JSONObject data = obtenerDatosEspecificosPorId(conn, idEjemplar, tipoDocumento);
+        // String isbn = (String) (data != null ? data.get("isbn") : null);
+        // Si el ISBN puede cambiar, necesitas pasarlo como parámetro también.
+        // Por ahora, asumiremos que solo se actualizan los campos que vienen en los parámetros.
+        // Si necesitas actualizar el ISBN, debes pasarlo como parámetro o recuperarlo de otro lugar.
+        // Para este ejemplo, asumiremos que el ISBN no se actualiza con este método.
+        String isbn = null; // O recuperar el existente si es necesario
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, isbn); // Si no se actualiza, puedes usar el valor actual o dejarlo como está
+            ps.setObject(2, idEditorial);
+            ps.setObject(3, idGenero);
+            ps.setObject(4, edicion);
+            ps.setInt(5, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                // Si no existe un registro, lo insertamos (esto podría ser útil si se cambia el tipo y se llama a este método)
+                // O lanzar una excepción si se espera que el registro ya exista
+                String insertSql = "INSERT INTO Libros (id_ejemplar, isbn, id_editorial, id_genero, edicion) VALUES (?, ?, ?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setString(2, isbn); // Puedes obtener el ISBN de otro lugar si es necesario
+                    psIns.setObject(3, idEditorial);
+                    psIns.setObject(4, idGenero);
+                    psIns.setObject(5, edicion);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Diccionario".equals(tipoDocumento)) {
+        String sql = "UPDATE Diccionarios SET isbn = ?, id_editorial = ?, idioma = ?, volumen = ? WHERE id_ejemplar = ?";
+        String isbn = null; // O recuperar el existente si es necesario
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, isbn);
+            ps.setObject(2, idEditorial);
+            ps.setString(3, null); // idioma
+            ps.setObject(4, volumen);
+            ps.setInt(5, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Diccionarios (id_ejemplar, isbn, id_editorial, idioma, volumen) VALUES (?, ?, ?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setString(2, isbn);
+                    psIns.setObject(3, idEditorial);
+                    psIns.setString(4, null); // idioma
+                    psIns.setObject(5, volumen);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Mapas".equals(tipoDocumento)) {
+        String sql = "UPDATE Mapas SET escala = ?, tipo_mapa = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, null); // escala
+            ps.setString(2, null); // tipo_mapa
+            ps.setInt(3, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Mapas (id_ejemplar, escala, tipo_mapa) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setString(2, null); // escala
+                    psIns.setString(3, null); // tipo_mapa
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Tesis".equals(tipoDocumento)) {
+        String sql = "UPDATE Tesis SET grado_academico = ?, facultad = ?, anio = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, null); // grado_academico
+            ps.setString(2, null); // facultad
+            ps.setObject(3, anio);
+            ps.setInt(4, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Tesis (id_ejemplar, grado_academico, facultad, anio) VALUES (?, ?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setString(2, null); // grado_academico
+                    psIns.setString(3, null); // facultad
+                    psIns.setObject(4, anio);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("DVD".equals(tipoDocumento) || "VHS".equals(tipoDocumento) || "CD".equals(tipoDocumento)) {
+        Time duracionTime = null;
+        if (duracion != null) {
+            try {
+                int minutos = duracion.intValue();
+                int horas = minutos / 60;
+                int minutosResto = minutos % 60;
+                duracionTime = Time.valueOf(String.format("%02d:%02d:00", horas, minutosResto));
+            } catch (IllegalArgumentException e) {
+                System.err.println("Error al convertir duración Long a Time para " + tipoDocumento + ": " + duracion + " minutos. Error: " + e.getMessage());
+                // Puedes manejar el error como consideres, por ahora se inserta como NULL
+            }
+        }
+
+        String tabla = "DVD".equals(tipoDocumento) ? "DVDs" : "VHS".equals(tipoDocumento) ? "VHS" : "CDs";
+        String sql = "UPDATE " + tabla + " SET duracion = ?, id_genero = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setTime(1, duracionTime);
+            ps.setObject(2, idGenero);
+            ps.setInt(3, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO " + tabla + " (id_ejemplar, duracion, id_genero) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setTime(2, duracionTime);
+                    psIns.setObject(3, idGenero);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Cassettes".equals(tipoDocumento)) {
+        Time duracionTime = null;
+        if (duracion != null) {
+            try {
+                int minutos = duracion.intValue();
+                int horas = minutos / 60;
+                int minutosResto = minutos % 60;
+                duracionTime = Time.valueOf(String.format("%02d:%02d:00", horas, minutosResto));
+            } catch (IllegalArgumentException e) {
+                System.err.println("Error al convertir duración Long a Time para Cassettes: " + duracion + " minutos. Error: " + e.getMessage());
+                // Puedes manejar el error como consideres, por ahora se inserta como NULL
+            }
+        }
+
+        String sql = "UPDATE Cassettes SET duracion = ?, id_tipo_cinta = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setTime(1, duracionTime);
+            ps.setObject(2, idTipoCinta);
+            ps.setInt(3, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Cassettes (id_ejemplar, duracion, id_tipo_cinta) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setTime(2, duracionTime);
+                    psIns.setObject(3, idTipoCinta);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Documento".equals(tipoDocumento)) {
+        String sql = "UPDATE Documentos SET id_tipo_detalle = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setObject(1, idTipoDetalle);
+            ps.setInt(2, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Documentos (id_ejemplar, id_tipo_detalle) VALUES (?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setObject(2, idTipoDetalle);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Periodicos".equals(tipoDocumento)) {
+        String sql = "UPDATE Periodicos SET fecha_publicacion = ?, id_tipo_periodico = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, null); // fecha_publicacion
+            ps.setObject(2, idTipoPeriodico);
+            ps.setInt(3, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Periodicos (id_ejemplar, fecha_publicacion, id_tipo_periodico) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setDate(2, null); // fecha_publicacion
+                    psIns.setObject(3, idTipoPeriodico);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Revistas".equals(tipoDocumento)) {
+        String sql = "UPDATE Revistas SET fecha_publicacion = ?, id_tipo_revista = ?, id_genero = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, null); // fecha_publicacion
+            ps.setObject(2, idTipoRevista);
+            ps.setObject(3, idGenero);
+            ps.setInt(4, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Revistas (id_ejemplar, fecha_publicacion, id_tipo_revista, id_genero) VALUES (?, ?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setDate(2, null); // fecha_publicacion
+                    psIns.setObject(3, idTipoRevista);
+                    psIns.setObject(4, idGenero);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    }
+}
+// Nuevo método para actualizar datos específicos en la subtabla correcta desde JSONObject
+private void actualizarSubtipoDesdeJSON(Connection conn, String tipoDocumento, int idEjemplar, JSONObject data) throws SQLException {
+    if ("Libro".equals(tipoDocumento)) {
+        Long idEditorialLong = obtenerLong(data, "id_editorial");
+        Long idGeneroLong = obtenerLong(data, "id_genero");
+        Long edicionLong = obtenerLong(data, "edicion");
+        String sql = "UPDATE Libros SET isbn = ?, id_editorial = ?, id_genero = ?, edicion = ? WHERE id_ejemplar = ?";
+        String isbn = (String) data.get("isbn"); // Obtener el ISBN del JSON
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, isbn);
+            ps.setObject(2, idEditorialLong);
+            ps.setObject(3, idGeneroLong);
+            ps.setObject(4, edicionLong);
+            ps.setInt(5, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                // Si no existe un registro, lo insertamos
+                String insertSql = "INSERT INTO Libros (id_ejemplar, isbn, id_editorial, id_genero, edicion) VALUES (?, ?, ?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setString(2, isbn);
+                    psIns.setObject(3, idEditorialLong);
+                    psIns.setObject(4, idGeneroLong);
+                    psIns.setObject(5, edicionLong);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Diccionario".equals(tipoDocumento)) {
+        Long idEditorialLong = obtenerLong(data, "id_editorial");
+        String idioma = (String) data.get("idioma");
+        Long volumenLong = obtenerLong(data, "volumen");
+        String sql = "UPDATE Diccionarios SET isbn = ?, id_editorial = ?, idioma = ?, volumen = ? WHERE id_ejemplar = ?";
+        String isbn = (String) data.get("isbn");
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, isbn);
+            ps.setObject(2, idEditorialLong);
+            ps.setString(3, idioma);
+            ps.setObject(4, volumenLong);
+            ps.setInt(5, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Diccionarios (id_ejemplar, isbn, id_editorial, idioma, volumen) VALUES (?, ?, ?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setString(2, isbn);
+                    psIns.setObject(3, idEditorialLong);
+                    psIns.setString(4, idioma);
+                    psIns.setObject(5, volumenLong);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Mapas".equals(tipoDocumento)) {
+        String escala = (String) data.get("escala");
+        String tipoMapa = (String) data.get("tipo_mapa");
+        String sql = "UPDATE Mapas SET escala = ?, tipo_mapa = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, escala);
+            ps.setString(2, tipoMapa);
+            ps.setInt(3, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Mapas (id_ejemplar, escala, tipo_mapa) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setString(2, escala);
+                    psIns.setString(3, tipoMapa);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Tesis".equals(tipoDocumento)) {
+        String grado_academico = (String) data.get("grado_academico");
+        String facultad = (String) data.get("facultad");
+        Long anioLong = obtenerLong(data, "anio");
+        String sql = "UPDATE Tesis SET grado_academico = ?, facultad = ?, anio = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, grado_academico);
+            ps.setString(2, facultad);
+            ps.setObject(3, anioLong);
+            ps.setInt(4, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Tesis (id_ejemplar, grado_academico, facultad, anio) VALUES (?, ?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setString(2, grado_academico);
+                    psIns.setString(3, facultad);
+                    psIns.setObject(4, anioLong);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("DVD".equals(tipoDocumento) || "VHS".equals(tipoDocumento) || "CD".equals(tipoDocumento)) {
+        Long duracionLong = obtenerLong(data, "duracion");
+        Time duracionTime = null;
+        if (duracionLong != null) {
+            try {
+                int minutos = duracionLong.intValue();
+                int horas = minutos / 60;
+                int minutosResto = minutos % 60;
+                duracionTime = Time.valueOf(String.format("%02d:%02d:00", horas, minutosResto));
+            } catch (IllegalArgumentException e) {
+                System.err.println("Error al convertir duración Long a Time para " + tipoDocumento + " desde JSONObject: " + duracionLong + " minutos. Error: " + e.getMessage());
+                // Puedes manejar el error como consideres, por ahora se inserta como NULL
+            }
+        }
+        Long idGeneroLong = obtenerLong(data, "id_genero");
+        String tabla = "DVD".equals(tipoDocumento) ? "DVDs" : "VHS".equals(tipoDocumento) ? "VHS" : "CDs";
+        String sql = "UPDATE " + tabla + " SET duracion = ?, id_genero = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setTime(1, duracionTime);
+            ps.setObject(2, idGeneroLong);
+            ps.setInt(3, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO " + tabla + " (id_ejemplar, duracion, id_genero) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setTime(2, duracionTime);
+                    psIns.setObject(3, idGeneroLong);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Cassettes".equals(tipoDocumento)) {
+        Long duracionLong = obtenerLong(data, "duracion");
+        Time duracionTime = null;
+        if (duracionLong != null) {
+            try {
+                int minutos = duracionLong.intValue();
+                int horas = minutos / 60;
+                int minutosResto = minutos % 60;
+                duracionTime = Time.valueOf(String.format("%02d:%02d:00", horas, minutosResto));
+            } catch (IllegalArgumentException e) {
+                System.err.println("Error al convertir duración Long a Time para Cassettes desde JSONObject: " + duracionLong + " minutos. Error: " + e.getMessage());
+                // Puedes manejar el error como consideres, por ahora se inserta como NULL
+            }
+        }
+        Long idTipoCintaLong = obtenerLong(data, "id_tipo_cinta");
+        String sql = "UPDATE Cassettes SET duracion = ?, id_tipo_cinta = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setTime(1, duracionTime);
+            ps.setObject(2, idTipoCintaLong);
+            ps.setInt(3, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Cassettes (id_ejemplar, duracion, id_tipo_cinta) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setTime(2, duracionTime);
+                    psIns.setObject(3, idTipoCintaLong);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Documento".equals(tipoDocumento)) {
+        Long idTipoDetalleLong = obtenerLong(data, "id_tipo_detalle");
+        String sql = "UPDATE Documentos SET id_tipo_detalle = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setObject(1, idTipoDetalleLong);
+            ps.setInt(2, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Documentos (id_ejemplar, id_tipo_detalle) VALUES (?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setObject(2, idTipoDetalleLong);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Periodicos".equals(tipoDocumento)) {
+        String fechaPubStr = (String) data.get("fecha_publicacion");
+        Date fechaPub = fechaPubStr != null ? Date.valueOf(fechaPubStr) : null;
+        Long idTipoPeriodicoLong = obtenerLong(data, "id_tipo_periodico");
+        String sql = "UPDATE Periodicos SET fecha_publicacion = ?, id_tipo_periodico = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, fechaPub);
+            ps.setObject(2, idTipoPeriodicoLong);
+            ps.setInt(3, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Periodicos (id_ejemplar, fecha_publicacion, id_tipo_periodico) VALUES (?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setDate(2, fechaPub);
+                    psIns.setObject(3, idTipoPeriodicoLong);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    } else if ("Revistas".equals(tipoDocumento)) {
+        String fechaPubStr = (String) data.get("fecha_publicacion");
+        Date fechaPub = fechaPubStr != null ? Date.valueOf(fechaPubStr) : null;
+        Long idTipoRevistaLong = obtenerLong(data, "id_tipo_revista");
+        Long idGeneroLong = obtenerLong(data, "id_genero");
+        String sql = "UPDATE Revistas SET fecha_publicacion = ?, id_tipo_revista = ?, id_genero = ? WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDate(1, fechaPub);
+            ps.setObject(2, idTipoRevistaLong);
+            ps.setObject(3, idGeneroLong);
+            ps.setInt(4, idEjemplar);
+            int filas = ps.executeUpdate();
+            if (filas == 0) {
+                String insertSql = "INSERT INTO Revistas (id_ejemplar, fecha_publicacion, id_tipo_revista, id_genero) VALUES (?, ?, ?, ?)";
+                try (PreparedStatement psIns = conn.prepareStatement(insertSql)) {
+                    psIns.setInt(1, idEjemplar);
+                    psIns.setDate(2, fechaPub);
+                    psIns.setObject(3, idTipoRevistaLong);
+                    psIns.setObject(4, idGeneroLong);
+                    psIns.executeUpdate();
+                }
+            }
+        }
+    }
+}
+public boolean eliminarEjemplar(int idEjemplar) {
+    Connection conn = null;
+    try {
+        conn = getConnection();
+        conn.setAutoCommit(false);
+
+        // La eliminación en cascada está definida en la base de datos con ON DELETE CASCADE
+        String sql = "DELETE FROM Ejemplares WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idEjemplar);
+            int filas = ps.executeUpdate();
+
+            if (filas == 0) {
+                throw new SQLException("No se encontró el ejemplar con ID: " + idEjemplar);
+            }
+        }
+
+        conn.commit();
+        return true;
+
+    } catch (SQLException e) {
+        if (conn != null) {
+            try {
+                conn.rollback();
+            } catch (SQLException ex) {
+                System.err.println("Error al hacer rollback en eliminarEjemplar: " + ex.getMessage());
+                Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error en rollback", ex);
+            }
+        }
+        System.err.println("Error al eliminar ejemplar: " + e.getMessage());
+        e.printStackTrace();
+        Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al eliminar ejemplar", e);
+        return false;
+    } finally {
+        if (conn != null) {
+            try {
+                conn.setAutoCommit(true);
+                conn.close();
+            } catch (SQLException e) {
+                Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al cerrar conexión", e);
+            }
+        }
+    }
+}
+
+
+
+// Método para editar un ejemplar existente (actualizado para manejar subtablas correctamente)
+
+    public boolean editarEjemplarDesdeJSON(int idEjemplar, JSONObject data) {
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            conn.setAutoCommit(false);
+
+            // --- 1. Actualizar datos generales del ejemplar ---
+            String titulo = (String) data.get("titulo");
+            Long idAutorLong = obtenerLong(data, "id_autor");
+            Integer idAutor = idAutorLong != null ? idAutorLong.intValue() : null;
+            String ubicacion = (String) data.get("ubicacion");
+            String tipoDocumento = (String) data.get("tipo_documento");
+
+            String sqlEjemplar = "UPDATE Ejemplares SET titulo = ?, id_autor = ?, ubicacion = ?, tipo_documento = ? WHERE id_ejemplar = ?";
+            try (PreparedStatement psEjemplar = conn.prepareStatement(sqlEjemplar)) {
+                psEjemplar.setString(1, titulo);
+                psEjemplar.setObject(2, idAutor);
+                psEjemplar.setString(3, ubicacion);
+                psEjemplar.setString(4, tipoDocumento);
+                psEjemplar.setInt(5, idEjemplar);
+                int filas = psEjemplar.executeUpdate();
+
+                if (filas == 0) {
+                    throw new SQLException("No se encontró el ejemplar con ID: " + idEjemplar);
+                }
+            }
+
+            // --- 2. Actualizar datos específicos según tipo de documento ---
+            // Dado que asumimos que el tipo_documento NO cambia, simplemente actualizamos el registro existente
+            actualizarSubtipoDesdeJSON(conn, tipoDocumento, idEjemplar, data);
+
+            conn.commit();
+            return true;
+
+        } catch (Exception e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    System.err.println("Error al hacer rollback en editarEjemplarDesdeJSON(JSONObject): " + ex.getMessage());
+                    Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error en rollback", ex);
+                }
+            }
+            System.err.println("Error al editar ejemplar desde JSON (JSONObject): " + e.getMessage());
+            e.printStackTrace();
+            Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al editar ejemplar desde JSON", e);
+            return false;
+        } finally {
+            // Manejar el cierre de la conexión con más cuidado
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException e) {
+                    System.err.println("Error al restaurar auto-commit en editarEjemplarDesdeJSON(JSONObject): " + e.getMessage());
+                    Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al restaurar auto-commit", e);
+                }
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    System.err.println("Error al cerrar conexión en editarEjemplarDesdeJSON(JSONObject): " + e.getMessage());
+                    Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al cerrar conexión", e);
+                    // IMPORTANTE: No se devuelve false aquí
                 }
             }
         }
@@ -172,9 +778,7 @@ public class EjemplaresModel extends Conexion {
             ORDER BY e.id_ejemplar
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
                 JSONObject ejemplar = new JSONObject();
@@ -194,42 +798,140 @@ public class EjemplaresModel extends Conexion {
     }
 
     // ------------------ Helpers ------------------
+    public boolean registrarEjemplarDesdeJSON(
+            JSONObject data,
+            Long idAutor,
+            Long idEditorial,
+            Long idGenero,
+            Long idTipoDetalle,
+            Long idTipoPeriodico,
+            Long idTipoRevista,
+            Long idTipoCinta,
+            Long cantidadCopias,
+            Long edicion,
+            Long volumen,
+            Long duracion,
+            Long anio,
+            Long numero
+    ) {
+        Connection conn = null;
+        try {
+            conn = utils.ConexionBD.getConnection();
+            conn.setAutoCommit(false); // Iniciar transacción
 
+            // Insertar en Ejemplares
+            String sqlEjemplar = "INSERT INTO Ejemplares (titulo, id_autor, ubicacion, tipo_documento) VALUES (?, ?, ?, ?)";
+            int idEjemplar;
+            try (PreparedStatement psEjemplar = conn.prepareStatement(sqlEjemplar, Statement.RETURN_GENERATED_KEYS)) {
+                psEjemplar.setString(1, (String) data.get("titulo"));
+                psEjemplar.setLong(2, idAutor);
+                psEjemplar.setString(3, (String) data.get("ubicacion"));
+                psEjemplar.setString(4, (String) data.get("tipo_documento"));
+                psEjemplar.executeUpdate();
+
+                try (ResultSet rs = psEjemplar.getGeneratedKeys()) {
+                    if (rs.next()) {
+                        idEjemplar = rs.getInt(1);
+                    } else {
+                        throw new SQLException("No se pudo obtener el ID del ejemplar recién insertado");
+                    }
+                }
+            }
+
+            // Insertar en la tabla específica según el tipo de documento
+            insertarSubtipoDesdeJSON(
+                    conn,
+                    (String) data.get("tipo_documento"),
+                    idEjemplar,
+                    data,
+                    idEditorial,
+                    idGenero,
+                    idTipoDetalle,
+                    idTipoPeriodico,
+                    idTipoRevista,
+                    idTipoCinta,
+                    edicion,
+                    volumen,
+                    duracion, // <--- PASAR EL VALOR 'duracion' AQUÍ
+                    anio,
+                    numero
+            );
+
+            // Crear las copias según la cantidad especificada
+            crearCopias(conn, idEjemplar, (String) data.get("tipo_documento"), cantidadCopias.intValue());
+
+            conn.commit(); // Confirmar transacción
+            return true;
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback(); // Revertir transacción en caso de error
+                } catch (SQLException ex) {
+                    System.err.println("Error al hacer rollback: " + ex.getMessage());
+                    // Loggear este error rollback, pero no detener el flujo principal
+                    Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al hacer rollback después de una excepción", ex);
+                }
+            }
+            System.err.println("Error al registrar ejemplar: " + e.getMessage());
+            e.printStackTrace(); // Muy útil para debugging
+            return false;
+        } finally {
+            // Manejar el cierre de la conexión con más cuidado
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true); // Restaurar auto-commit
+                } catch (SQLException e) {
+                    System.err.println("Error al restaurar auto-commit: " + e.getMessage());
+                    Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al restaurar auto-commit", e);
+                    // No se detiene la ejecución, solo se loggea
+                }
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    System.err.println("Error al cerrar conexión: " + e.getMessage());
+                    Logger.getLogger(EjemplaresModel.class.getName()).log(Level.WARNING, "Error al cerrar conexión", e);
+                    // No se detiene la ejecución, solo se loggea
+                    // IMPORTANTE: No se devuelve false aquí, porque la operación principal (commit) ya se hizo.
+                }
+            }
+        }
+    }
+
+    // Actualiza tu método insertarSubtipoDesdeJSON para recibir todos los parámetros
+    // Agrega esta versión del método (antes de los otros métodos auxiliares)
     private void insertarSubtipoDesdeJSON(Connection conn, String tipoDocumento, int idEjemplar, JSONObject data) throws SQLException {
         if ("Libro".equals(tipoDocumento)) {
             String isbn = (String) data.get("isbn");
-            Long idEditorialLong = (Long) data.get("id_editorial");
-            Integer idEditorial = idEditorialLong != null ? idEditorialLong.intValue() : null;
-            Long idGeneroLong = (Long) data.get("id_genero");
-            Integer idGenero = idGeneroLong != null ? idGeneroLong.intValue() : null;
-            Long edicionLong = (Long) data.get("edicion");
-            Integer edicion = edicionLong != null ? edicionLong.intValue() : null;
-
+            Long idEditorialLong = obtenerLong(data, "id_editorial");
+            Long idGeneroLong = obtenerLong(data, "id_genero");
+            Long edicionLong = obtenerLong(data, "edicion");
             String sql = "INSERT INTO Libros (id_ejemplar, isbn, id_editorial, id_genero, edicion) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 ps.setString(2, isbn);
-                ps.setObject(3, idEditorial);
-                ps.setObject(4, idGenero);
-                ps.setObject(5, edicion);
+                // Usar setLong o setObject directamente con el Long, no convertir a int
+                ps.setObject(3, idEditorialLong); // Puede ser null, setObject lo maneja
+                ps.setObject(4, idGeneroLong);
+                ps.setObject(5, edicionLong);
                 ps.executeUpdate();
             }
         } else if ("Diccionario".equals(tipoDocumento)) {
+            String isbn = (String) data.get("isbn");
             String idioma = (String) data.get("idioma");
-            Long volumenLong = (Long) data.get("volumen");
-            Integer volumen = volumenLong != null ? volumenLong.intValue() : null;
-
-            String sql = "INSERT INTO Diccionarios (id_ejemplar, idioma, volumen) VALUES (?, ?, ?)";
+            Long idEditorialLong = obtenerLong(data, "id_editorial");
+            Long volumenLong = obtenerLong(data, "volumen");
+            String sql = "INSERT INTO Diccionarios (id_ejemplar, isbn, id_editorial, idioma, volumen) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
-                ps.setString(2, idioma);
-                ps.setObject(3, volumen);
+                ps.setString(2, isbn);
+                ps.setObject(3, idEditorialLong);
+                ps.setString(4, idioma);
+                ps.setObject(5, volumenLong);
                 ps.executeUpdate();
             }
         } else if ("Mapas".equals(tipoDocumento)) {
             String escala = (String) data.get("escala");
             String tipoMapa = (String) data.get("tipo_mapa");
-
             String sql = "INSERT INTO Mapas (id_ejemplar, escala, tipo_mapa) VALUES (?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
@@ -238,110 +940,276 @@ public class EjemplaresModel extends Conexion {
                 ps.executeUpdate();
             }
         } else if ("Tesis".equals(tipoDocumento)) {
-            String grado = (String) data.get("grado_academico");
-            String facultad = (String) data.get("facultad");
-
-            String sql = "INSERT INTO Tesis (id_ejemplar, grado_academico, facultad) VALUES (?, ?, ?)";
+            String institucion = (String) data.get("institucion");
+            String director = (String) data.get("director");
+            Long anioLong = obtenerLong(data, "anio");
+            String sql = "INSERT INTO Tesis (id_ejemplar, institucion, director, anio) VALUES (?, ?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
-                ps.setString(2, grado);
-                ps.setString(3, facultad);
+                ps.setString(2, institucion);
+                ps.setString(3, director);
+                ps.setObject(4, anioLong); // Puede ser null
                 ps.executeUpdate();
             }
         } else if ("DVD".equals(tipoDocumento) || "VHS".equals(tipoDocumento) || "CD".equals(tipoDocumento)) {
-            String duracionStr = (String) data.get("duracion");
-            Time duracion = duracionStr != null ? Time.valueOf(duracionStr) : null;
-            Long idGeneroLong = (Long) data.get("id_genero");
-            Integer idGenero = idGeneroLong != null ? idGeneroLong.intValue() : null;
+            // <--- CORREGIDO: OBTENER 'duracion' DEL JSONOBJECT Y CONVERTIRLO A TIME AQUÍ
+            Long duracionLong = obtenerLong(data, "duracion"); // Obtiene el número de minutos como Long
+            Time duracionTime = null;
+            if (duracionLong != null) { // Verificar si el Long es null
+                try {
+                    int minutos = duracionLong.intValue(); // Convertir Long a int para cálculos
+                    int horas = minutos / 60;
+                    int minutosResto = minutos % 60;
+                    // Formatear a HH:mm:ss para Time.valueOf
+                    duracionTime = Time.valueOf(String.format("%02d:%02d:00", horas, minutosResto));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("Error al convertir duración Long a Time para " + tipoDocumento + " desde JSONObject: " + duracionLong + " minutos. Error: " + e.getMessage());
+                    // Opcional: lanzar una SQLException si la duración es inválida
+                    // throw new SQLException("Duración inválida: " + duracionLong, e);
+                    // Por ahora, se inserta como NULL si no se puede convertir
+                }
+            }
 
+            Long idGeneroLong = obtenerLong(data, "id_genero");
             String tabla = "DVD".equals(tipoDocumento) ? "DVDs" : "VHS".equals(tipoDocumento) ? "VHS" : "CDs";
             String sql = "INSERT INTO " + tabla + " (id_ejemplar, duracion, id_genero) VALUES (?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
-                ps.setTime(2, duracion);
-                ps.setObject(3, idGenero);
+                ps.setTime(2, duracionTime); // Usar el Time calculado
+                ps.setObject(3, idGeneroLong); // Usar el Long directamente
                 ps.executeUpdate();
             }
         } else if ("Cassettes".equals(tipoDocumento)) {
-            String duracionStr = (String) data.get("duracion");
-            Time duracion = duracionStr != null ? Time.valueOf(duracionStr) : null;
-            Long idTipoCintaLong = (Long) data.get("id_tipo_cinta");
-            Integer idTipoCinta = idTipoCintaLong != null ? idTipoCintaLong.intValue() : null;
+            // <--- CORREGIDO: OBTENER 'duracion' DEL JSONOBJECT Y CONVERTIRLO A TIME AQUÍ
+            Long duracionLong = obtenerLong(data, "duracion"); // Obtiene el número de minutos como Long
+            Time duracionTime = null;
+            if (duracionLong != null) { // Verificar si el Long es null
+                try {
+                    int minutos = duracionLong.intValue(); // Convertir Long a int para cálculos
+                    int horas = minutos / 60;
+                    int minutosResto = minutos % 60;
+                    // Formatear a HH:mm:ss para Time.valueOf
+                    duracionTime = Time.valueOf(String.format("%02d:%02d:00", horas, minutosResto));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("Error al convertir duración Long a Time para Cassettes desde JSONObject: " + duracionLong + " minutos. Error: " + e.getMessage());
+                    // Opcional: lanzar una SQLException si la duración es inválida
+                    // throw new SQLException("Duración inválida: " + duracionLong, e);
+                    // Por ahora, se inserta como NULL si no se puede convertir
+                }
+            }
 
+            Long idTipoCintaLong = obtenerLong(data, "id_tipo_cinta");
             String sql = "INSERT INTO Cassettes (id_ejemplar, duracion, id_tipo_cinta) VALUES (?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
-                ps.setTime(2, duracion);
-                ps.setObject(3, idTipoCinta);
+                ps.setTime(2, duracionTime); // Usar el Time calculado
+                ps.setObject(3, idTipoCintaLong); // Usar el Long directamente
                 ps.executeUpdate();
             }
         } else if ("Documento".equals(tipoDocumento)) {
-            Long idTipoDetalleLong = (Long) data.get("id_tipo_detalle");
-            Integer idTipoDetalle = idTipoDetalleLong != null ? idTipoDetalleLong.intValue() : null;
-
+            Long idTipoDetalleLong = obtenerLong(data, "id_tipo_detalle");
             String sql = "INSERT INTO Documentos (id_ejemplar, id_tipo_detalle) VALUES (?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
-                ps.setObject(2, idTipoDetalle);
+                ps.setObject(2, idTipoDetalleLong); // Usar el Long directamente
                 ps.executeUpdate();
             }
         } else if ("Periodicos".equals(tipoDocumento)) {
             String fechaPubStr = (String) data.get("fecha_publicacion");
             Date fechaPub = fechaPubStr != null ? Date.valueOf(fechaPubStr) : null;
-            Long idTipoPeriodicoLong = (Long) data.get("id_tipo_periodico");
-            Integer idTipoPeriodico = idTipoPeriodicoLong != null ? idTipoPeriodicoLong.intValue() : null;
-
+            Long idTipoPeriodicoLong = obtenerLong(data, "id_tipo_periodico");
             String sql = "INSERT INTO Periodicos (id_ejemplar, fecha_publicacion, id_tipo_periodico) VALUES (?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 ps.setDate(2, fechaPub);
-                ps.setObject(3, idTipoPeriodico);
+                ps.setObject(3, idTipoPeriodicoLong); // Usar el Long directamente
                 ps.executeUpdate();
             }
         } else if ("Revistas".equals(tipoDocumento)) {
             String fechaPubStr = (String) data.get("fecha_publicacion");
             Date fechaPub = fechaPubStr != null ? Date.valueOf(fechaPubStr) : null;
-            Long idTipoRevistaLong = (Long) data.get("id_tipo_revista");
-            Integer idTipoRevista = idTipoRevistaLong != null ? idTipoRevistaLong.intValue() : null;
-            Long idGeneroLong = (Long) data.get("id_genero");
-            Integer idGenero = idGeneroLong != null ? idGeneroLong.intValue() : null;
-
+            Long idTipoRevistaLong = obtenerLong(data, "id_tipo_revista");
+            Long idGeneroLong = obtenerLong(data, "id_genero");
             String sql = "INSERT INTO Revistas (id_ejemplar, fecha_publicacion, id_tipo_revista, id_genero) VALUES (?, ?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 ps.setDate(2, fechaPub);
-                ps.setObject(3, idTipoRevista);
-                ps.setObject(4, idGenero);
+                ps.setObject(3, idTipoRevistaLong); // Usar el Long directamente
+                ps.setObject(4, idGeneroLong); // Usar el Long directamente
                 ps.executeUpdate();
             }
         }
     }
 
-    // Eliminar registro de tabla específica
-    private void eliminarSubtipo(Connection conn, String tipoDocumento, int idEjemplar) throws SQLException {
-        String tabla = null;
-        if ("Libro".equals(tipoDocumento)) tabla = "Libros";
-        else if ("Diccionario".equals(tipoDocumento)) tabla = "Diccionarios";
-        else if ("Mapas".equals(tipoDocumento)) tabla = "Mapas";
-        else if ("Tesis".equals(tipoDocumento)) tabla = "Tesis";
-        else if ("DVD".equals(tipoDocumento)) tabla = "DVDs";
-        else if ("VHS".equals(tipoDocumento)) tabla = "VHS";
-        else if ("Cassettes".equals(tipoDocumento)) tabla = "Cassettes";
-        else if ("CD".equals(tipoDocumento)) tabla = "CDs";
-        else if ("Documento".equals(tipoDocumento)) tabla = "Documentos";
-        else if ("Periodicos".equals(tipoDocumento)) tabla = "Periodicos";
-        else if ("Revistas".equals(tipoDocumento)) tabla = "Revistas";
+    // Método auxiliar para obtener Long de forma segura
+    private Long obtenerLong(JSONObject data, String key) {
+        Object obj = data.get(key);
+        if (obj == null) {
+            return null;
+        }
+        if (obj instanceof Long) {
+            return (Long) obj;
+        } else if (obj instanceof Integer) {
+            return ((Integer) obj).longValue();
+        } else if (obj instanceof String) {
+            try {
+                return Long.parseLong((String) obj);
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        } else if (obj instanceof Number) {
+            return ((Number) obj).longValue();
+        }
+        return null;
+    }
+    // Agrega esta versión del método (después de la versión de 4 parámetros)
 
-        if (tabla != null) {
-            String sql = "DELETE FROM " + tabla + " WHERE id_ejemplar = ?";
+    // Agrega esta versión del método (después de la versión de 4 parámetros)
+    // Agrega esta versión del método (después de la versión de 4 parámetros)
+    private void insertarSubtipoDesdeJSON(
+            Connection conn,
+            String tipoDocumento,
+            int idEjemplar,
+            JSONObject data, // Aún se puede usar para otros campos si es necesario
+            Long idEditorial,
+            Long idGenero,
+            Long idTipoDetalle,
+            Long idTipoPeriodico,
+            Long idTipoRevista,
+            Long idTipoCinta,
+            Long edicion,
+            Long volumen,
+            Long duracion, // <--- El valor LONG ya validado
+            Long anio,
+            Long numero
+    ) throws SQLException {
+        if ("Libro".equals(tipoDocumento)) {
+            String isbn = (String) data.get("isbn");
+            String sql = "INSERT INTO Libros (id_ejemplar, isbn, id_editorial, id_genero, edicion) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
+                ps.setString(2, isbn);
+                // Usar setLong o setObject directamente con el Long, no convertir a int
+                ps.setObject(3, idEditorial); // Puede ser null, setObject lo maneja
+                ps.setObject(4, idGenero);
+                ps.setObject(5, edicion);
+                ps.executeUpdate();
+            }
+        } else if ("Diccionario".equals(tipoDocumento)) {
+            String isbn = (String) data.get("isbn");
+            String idioma = (String) data.get("idioma");
+            String sql = "INSERT INTO Diccionarios (id_ejemplar, isbn, id_editorial, idioma, volumen) VALUES (?, ?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.setString(2, isbn);
+                ps.setObject(3, idEditorial);
+                ps.setString(4, idioma);
+                ps.setObject(5, volumen);
+                ps.executeUpdate();
+            }
+        } else if ("Mapas".equals(tipoDocumento)) {
+            String escala = (String) data.get("escala");
+            String tipoMapa = (String) data.get("tipo_mapa");
+            String sql = "INSERT INTO Mapas (id_ejemplar, escala, tipo_mapa) VALUES (?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.setString(2, escala);
+                ps.setString(3, tipoMapa);
+                ps.executeUpdate();
+            }
+        } else if ("Tesis".equals(tipoDocumento)) {
+            String institucion = (String) data.get("institucion");
+            String director = (String) data.get("director");
+            String sql = "INSERT INTO Tesis (id_ejemplar, institucion, director, anio) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.setString(2, institucion);
+                ps.setString(3, director);
+                ps.setObject(4, anio); // Puede ser null
+                ps.executeUpdate();
+            }
+        } else if ("DVD".equals(tipoDocumento) || "VHS".equals(tipoDocumento) || "CD".equals(tipoDocumento)) {
+            // <--- CORREGIDO: USAR EL PARÁMETRO 'duracion' LONG Y CONVERTIRLO A TIME AQUÍ
+            Time duracionTime = null;
+            if (duracion != null) { // Verificar si el Long es null
+                try {
+                    int minutos = duracion.intValue(); // Convertir Long a int para cálculos
+                    int horas = minutos / 60;
+                    int minutosResto = minutos % 60;
+                    // Formatear a HH:mm:ss para Time.valueOf
+                    duracionTime = Time.valueOf(String.format("%02d:%02d:00", horas, minutosResto));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("Error al convertir duración Long a Time para " + tipoDocumento + ": " + duracion + " minutos. Error: " + e.getMessage());
+                    // Opcional: lanzar una SQLException si la duración es inválida
+                    // throw new SQLException("Duración inválida: " + duracion, e);
+                    // Por ahora, se inserta como NULL si no se puede convertir
+                }
+            }
+
+            String tabla = "DVD".equals(tipoDocumento) ? "DVDs" : "VHS".equals(tipoDocumento) ? "VHS" : "CDs";
+            String sql = "INSERT INTO " + tabla + " (id_ejemplar, duracion, id_genero) VALUES (?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.setTime(2, duracionTime); // Usar el Time calculado
+                ps.setObject(3, idGenero); // Usar el Long directamente
+                ps.executeUpdate();
+            }
+        } else if ("Cassettes".equals(tipoDocumento)) {
+            // <--- CORREGIDO: USAR EL PARÁMETRO 'duracion' LONG Y CONVERTIRLO A TIME AQUÍ
+            Time duracionTime = null;
+            if (duracion != null) { // Verificar si el Long es null
+                try {
+                    int minutos = duracion.intValue(); // Convertir Long a int para cálculos
+                    int horas = minutos / 60;
+                    int minutosResto = minutos % 60;
+                    // Formatear a HH:mm:ss para Time.valueOf
+                    duracionTime = Time.valueOf(String.format("%02d:%02d:00", horas, minutosResto));
+                } catch (IllegalArgumentException e) {
+                    System.err.println("Error al convertir duración Long a Time para Cassettes: " + duracion + " minutos. Error: " + e.getMessage());
+                    // Opcional: lanzar una SQLException si la duración es inválida
+                    // throw new SQLException("Duración inválida: " + duracion, e);
+                    // Por ahora, se inserta como NULL si no se puede convertir
+                }
+            }
+
+            String sql = "INSERT INTO Cassettes (id_ejemplar, duracion, id_tipo_cinta) VALUES (?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.setTime(2, duracionTime); // Usar el Time calculado
+                ps.setObject(3, idTipoCinta); // Usar el Long directamente
+                ps.executeUpdate();
+            }
+        } else if ("Documento".equals(tipoDocumento)) {
+            String sql = "INSERT INTO Documentos (id_ejemplar, id_tipo_detalle) VALUES (?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.setObject(2, idTipoDetalle); // Usar el Long directamente
+                ps.executeUpdate();
+            }
+        } else if ("Periodicos".equals(tipoDocumento)) {
+            String fechaPubStr = (String) data.get("fecha_publicacion");
+            Date fechaPub = fechaPubStr != null ? Date.valueOf(fechaPubStr) : null;
+            String sql = "INSERT INTO Periodicos (id_ejemplar, fecha_publicacion, id_tipo_periodico) VALUES (?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.setDate(2, fechaPub);
+                ps.setObject(3, idTipoPeriodico); // Usar el Long directamente
+                ps.executeUpdate();
+            }
+        } else if ("Revistas".equals(tipoDocumento)) {
+            String fechaPubStr = (String) data.get("fecha_publicacion");
+            Date fechaPub = fechaPubStr != null ? Date.valueOf(fechaPubStr) : null;
+            String sql = "INSERT INTO Revistas (id_ejemplar, fecha_publicacion, id_tipo_revista, id_genero) VALUES (?, ?, ?, ?)";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.setDate(2, fechaPub);
+                ps.setObject(3, idTipoRevista); // Usar el Long directamente
+                ps.setObject(4, idGenero); // Usar el Long directamente
                 ps.executeUpdate();
             }
         }
     }
 
-    // Método privado reutilizable para crear copias
     private void crearCopias(Connection conn, int idEjemplar, String tipoDocumento, int cantidad) throws SQLException {
         String prefijo = obtenerPrefijo(tipoDocumento);
         for (int i = 1; i <= cantidad; i++) {
@@ -357,19 +1225,68 @@ public class EjemplaresModel extends Conexion {
         }
     }
 
+    // Eliminar registro de tabla específica
+    private void eliminarSubtipo(Connection conn, String tipoDocumento, int idEjemplar) throws SQLException {
+        String tabla = null;
+        if ("Libro".equals(tipoDocumento)) {
+            tabla = "Libros";
+        } else if ("Diccionario".equals(tipoDocumento)) {
+            tabla = "Diccionarios";
+        } else if ("Mapas".equals(tipoDocumento)) {
+            tabla = "Mapas";
+        } else if ("Tesis".equals(tipoDocumento)) {
+            tabla = "Tesis";
+        } else if ("DVD".equals(tipoDocumento)) {
+            tabla = "DVDs";
+        } else if ("VHS".equals(tipoDocumento)) {
+            tabla = "VHS";
+        } else if ("Cassettes".equals(tipoDocumento)) {
+            tabla = "Cassettes";
+        } else if ("CD".equals(tipoDocumento)) {
+            tabla = "CDs";
+        } else if ("Documento".equals(tipoDocumento)) {
+            tabla = "Documentos";
+        } else if ("Periodicos".equals(tipoDocumento)) {
+            tabla = "Periodicos";
+        } else if ("Revistas".equals(tipoDocumento)) {
+            tabla = "Revistas";
+        }
+
+        if (tabla != null) {
+            String sql = "DELETE FROM " + tabla + " WHERE id_ejemplar = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                ps.executeUpdate();
+            }
+        }
+    }
+
     private String obtenerPrefijo(String tipoDocumento) {
-        if ("Libro".equals(tipoDocumento)) return "LIB";
-        else if ("Revistas".equals(tipoDocumento)) return "REV";
-        else if ("CD".equals(tipoDocumento)) return "CDA";
-        else if ("DVD".equals(tipoDocumento)) return "DVD";
-        else if ("Diccionario".equals(tipoDocumento)) return "DIC";
-        else if ("Mapas".equals(tipoDocumento)) return "MAP";
-        else if ("Tesis".equals(tipoDocumento)) return "TES";
-        else if ("VHS".equals(tipoDocumento)) return "VHS";
-        else if ("Cassettes".equals(tipoDocumento)) return "CAS";
-        else if ("Documento".equals(tipoDocumento)) return "DOC";
-        else if ("Periodicos".equals(tipoDocumento)) return "PER";
-        else return "UNK";
+        if ("Libro".equals(tipoDocumento)) {
+            return "LIB";
+        } else if ("Revistas".equals(tipoDocumento)) {
+            return "REV";
+        } else if ("CD".equals(tipoDocumento)) {
+            return "CDA";
+        } else if ("DVD".equals(tipoDocumento)) {
+            return "DVD";
+        } else if ("Diccionario".equals(tipoDocumento)) {
+            return "DIC";
+        } else if ("Mapas".equals(tipoDocumento)) {
+            return "MAP";
+        } else if ("Tesis".equals(tipoDocumento)) {
+            return "TES";
+        } else if ("VHS".equals(tipoDocumento)) {
+            return "VHS";
+        } else if ("Cassettes".equals(tipoDocumento)) {
+            return "CAS";
+        } else if ("Documento".equals(tipoDocumento)) {
+            return "DOC";
+        } else if ("Periodicos".equals(tipoDocumento)) {
+            return "PER";
+        } else {
+            return "UNK";
+        }
     }
 
     private int obtenerSiguienteNumeroSecuencial(Connection conn, String prefijo) throws SQLException {
@@ -382,5 +1299,221 @@ public class EjemplaresModel extends Conexion {
             }
         }
         return 1;
+    }
+
+    // === OBTENER COPIAS POR EJEMPLAR ===
+    public List<JSONObject> obtenerCopiasPorEjemplar(int idEjemplar) {
+        List<JSONObject> lista = new ArrayList<>();
+        String sql = """
+        SELECT id_copia, codigo_unico, estado
+        FROM Copias
+        WHERE id_ejemplar = ?
+        ORDER BY id_copia
+        """;
+
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, idEjemplar);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    JSONObject copia = new JSONObject();
+                    copia.put("id_copia", rs.getInt("id_copia"));
+                    copia.put("codigo_unico", rs.getString("codigo_unico"));
+                    copia.put("estado", rs.getString("estado"));
+
+                    lista.add(copia);
+                }
+            }
+
+        } catch (SQLException e) {
+            Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al obtener copias del ejemplar", e);
+        }
+        return lista;
+    }
+
+    // === OBTENER EJEMPLAR POR ID (como JSON) ===
+    public JSONObject obtenerPorId(int idEjemplar) {
+        String sql = """
+        SELECT e.id_ejemplar, e.titulo, e.id_autor, e.ubicacion, e.tipo_documento, a.nombre_autor
+        FROM Ejemplares e
+        LEFT JOIN Autores a ON e.id_autor = a.id_autor
+        WHERE e.id_ejemplar = ?
+        """;
+
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, idEjemplar);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    JSONObject ejemplar = new JSONObject();
+                    ejemplar.put("id_ejemplar", rs.getInt("id_ejemplar"));
+                    ejemplar.put("titulo", rs.getString("titulo"));
+                    ejemplar.put("id_autor", rs.getObject("id_autor")); // Puede ser null
+                    ejemplar.put("ubicacion", rs.getString("ubicacion"));
+                    ejemplar.put("tipo_documento", rs.getString("tipo_documento"));
+                    ejemplar.put("nombre_autor", rs.getString("nombre_autor")); // Puede ser null
+
+                    // Cargar datos específicos según tipo
+                    JSONObject datosEspecificos = obtenerDatosEspecificosPorId(conn, idEjemplar, rs.getString("tipo_documento"));
+                    if (datosEspecificos != null) {
+                        ejemplar.putAll(datosEspecificos);
+                    }
+
+                    return ejemplar;
+                }
+            }
+
+        } catch (SQLException e) {
+            Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al obtener ejemplar por ID: " + idEjemplar, e);
+        }
+        return null;
+    }
+
+    // === OBTENER DATOS ESPECÍFICOS POR ID EJEMPLAR Y TIPO ===
+    private JSONObject obtenerDatosEspecificosPorId(Connection conn, int idEjemplar, String tipoDocumento) throws SQLException {
+        JSONObject datos = new JSONObject();
+
+        if ("Libro".equals(tipoDocumento)) {
+            String sql = """
+            SELECT isbn, id_editorial, id_genero, edicion
+            FROM Libros
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("isbn", rs.getString("isbn"));
+                        datos.put("id_editorial", rs.getObject("id_editorial"));
+                        datos.put("id_genero", rs.getObject("id_genero"));
+                        datos.put("edicion", rs.getObject("edicion"));
+                    }
+                }
+            }
+        } else if ("Diccionario".equals(tipoDocumento)) {
+            String sql = """
+            SELECT isbn, idioma, volumen
+            FROM Diccionarios
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("isbn", rs.getString("isbn"));
+                        datos.put("idioma", rs.getString("idioma"));
+                        datos.put("volumen", rs.getObject("volumen"));
+                    }
+                }
+            }
+        } else if ("Mapas".equals(tipoDocumento)) {
+            String sql = """
+            SELECT escala, tipo_mapa
+            FROM Mapas
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("escala", rs.getString("escala"));
+                        datos.put("tipo_mapa", rs.getString("tipo_mapa"));
+                    }
+                }
+            }
+        } else if ("Tesis".equals(tipoDocumento)) {
+            String sql = """
+            SELECT grado_academico, facultad
+            FROM Tesis
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("grado_academico", rs.getString("grado_academico"));
+                        datos.put("facultad", rs.getString("facultad"));
+                    }
+                }
+            }
+        } else if ("DVD".equals(tipoDocumento) || "VHS".equals(tipoDocumento) || "CD".equals(tipoDocumento)) {
+            String tabla = "DVD".equals(tipoDocumento) ? "DVDs" : "VHS".equals(tipoDocumento) ? "VHS" : "CDs";
+            String sql = """
+            SELECT duracion, id_genero
+            FROM """ + tabla + """
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("duracion", rs.getTime("duracion"));
+                        datos.put("id_genero", rs.getObject("id_genero"));
+                    }
+                }
+            }
+        } else if ("Cassettes".equals(tipoDocumento)) {
+            String sql = """
+            SELECT duracion, id_tipo_cinta
+            FROM Cassettes
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("duracion", rs.getTime("duracion"));
+                        datos.put("id_tipo_cinta", rs.getObject("id_tipo_cinta"));
+                    }
+                }
+            }
+        } else if ("Documento".equals(tipoDocumento)) {
+            String sql = """
+            SELECT id_tipo_detalle
+            FROM Documentos
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("id_tipo_detalle", rs.getObject("id_tipo_detalle"));
+                    }
+                }
+            }
+        } else if ("Periodicos".equals(tipoDocumento)) {
+            String sql = """
+            SELECT fecha_publicacion, id_tipo_periodico
+            FROM Periodicos
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("fecha_publicacion", rs.getDate("fecha_publicacion"));
+                        datos.put("id_tipo_periodico", rs.getObject("id_tipo_periodico"));
+                    }
+                }
+            }
+        } else if ("Revistas".equals(tipoDocumento)) {
+            String sql = """
+            SELECT fecha_publicacion, id_tipo_revista, id_genero
+            FROM Revistas
+            WHERE id_ejemplar = ?
+            """;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("fecha_publicacion", rs.getDate("fecha_publicacion"));
+                        datos.put("id_tipo_revista", rs.getObject("id_tipo_revista"));
+                        datos.put("id_genero", rs.getObject("id_genero"));
+                    }
+                }
+            }
+        }
+
+        return datos.isEmpty() ? null : datos;
     }
 }

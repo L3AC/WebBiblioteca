@@ -14,7 +14,7 @@ public class TiposCintaModel extends Conexion {
     public boolean registrarTipoCinta(JSONObject data) {
         String nombre = (String) data.get("nombre_tipo_cinta");
         if (existeNombreTipoCinta(nombre)) {
-            Logger.getLogger(TipoCintaModel.class.getName()).log(Level.WARNING, "Intento de registro con nombre duplicado: {0}", nombre);
+            Logger.getLogger(TiposCintaModel.class.getName()).log(Level.WARNING, "Intento de registro con nombre duplicado: {0}", nombre);
             return false;
         }
 
@@ -32,14 +32,14 @@ public class TiposCintaModel extends Conexion {
             if (filas > 0) {
                 try (ResultSet rs = ps.getGeneratedKeys()) {
                     if (rs.next()) {
-                        Logger.getLogger(TipoCintaModel.class.getName()).log(Level.INFO, "Tipo de cinta registrado: ID={0}, Nombre={1}", new Object[]{rs.getInt(1), nombre});
+                        Logger.getLogger(TiposCintaModel.class.getName()).log(Level.INFO, "Tipo de cinta registrado: ID={0}, Nombre={1}", new Object[]{rs.getInt(1), nombre});
                     }
                 }
                 return true;
             }
 
         } catch (SQLException e) {
-            Logger.getLogger(TipoCintaModel.class.getName()).log(Level.SEVERE, "Error al registrar tipo de cinta: " + nombre, e);
+            Logger.getLogger(TiposCintaModel.class.getName()).log(Level.SEVERE, "Error al registrar tipo de cinta: " + nombre, e);
         }
         return false;
     }
@@ -54,7 +54,7 @@ public class TiposCintaModel extends Conexion {
                 return rs.next();
             }
         } catch (SQLException e) {
-            Logger.getLogger(TipoCintaModel.class.getName()).log(Level.SEVERE, "Error al verificar existencia de tipo de cinta: " + nombre, e);
+            Logger.getLogger(TiposCintaModel.class.getName()).log(Level.SEVERE, "Error al verificar existencia de tipo de cinta: " + nombre, e);
             return false;
         }
     }
@@ -81,7 +81,7 @@ public class TiposCintaModel extends Conexion {
             }
 
         } catch (SQLException e) {
-            Logger.getLogger(TipoCintaModel.class.getName()).log(Level.SEVERE, "Error al obtener tipo de cinta por ID: " + idTipoCinta, e);
+            Logger.getLogger(TiposCintaModel.class.getName()).log(Level.SEVERE, "Error al obtener tipo de cinta por ID: " + idTipoCinta, e);
         }
         return null;
     }
@@ -108,7 +108,7 @@ public class TiposCintaModel extends Conexion {
             }
 
         } catch (SQLException e) {
-            Logger.getLogger(TipoCintaModel.class.getName()).log(Level.SEVERE, "Error al listar tipos de cinta", e);
+            Logger.getLogger(TiposCintaModel.class.getName()).log(Level.SEVERE, "Error al listar tipos de cinta", e);
         }
         return lista;
     }
@@ -121,7 +121,7 @@ public class TiposCintaModel extends Conexion {
         if (existeNombreTipoCinta(nombre)) {
             JSONObject existente = obtenerPorNombre(nombre);
             if (existente != null && !existente.get("id_tipo_cinta").equals((long) idTipoCinta)) {
-                Logger.getLogger(TipoCintaModel.class.getName()).log(Level.WARNING, "Actualización cancelada: nombre duplicado: {0}", nombre);
+                Logger.getLogger(TiposCintaModel.class.getName()).log(Level.WARNING, "Actualización cancelada: nombre duplicado: {0}", nombre);
                 return false;
             }
         }
@@ -141,7 +141,7 @@ public class TiposCintaModel extends Conexion {
             return ps.executeUpdate() > 0;
 
         } catch (SQLException e) {
-            Logger.getLogger(TipoCintaModel.class.getName()).log(Level.SEVERE, "Error al actualizar tipo de cinta ID: " + idTipoCinta, e);
+            Logger.getLogger(TiposCintaModel.class.getName()).log(Level.SEVERE, "Error al actualizar tipo de cinta ID: " + idTipoCinta, e);
             return false;
         }
     }
@@ -154,7 +154,7 @@ public class TiposCintaModel extends Conexion {
             ps.setInt(1, idTipoCinta);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
-            Logger.getLogger(TipoCintaModel.class.getName()).log(Level.SEVERE, "Error al eliminar tipo de cinta con ID: " + idTipoCinta, e);
+            Logger.getLogger(TiposCintaModel.class.getName()).log(Level.SEVERE, "Error al eliminar tipo de cinta con ID: " + idTipoCinta, e);
             return false;
         }
     }
@@ -181,7 +181,7 @@ public class TiposCintaModel extends Conexion {
             }
 
         } catch (SQLException e) {
-            Logger.getLogger(TipoCintaModel.class.getName()).log(Level.SEVERE, "Error al obtener tipo de cinta por nombre: " + nombre, e);
+            Logger.getLogger(TiposCintaModel.class.getName()).log(Level.SEVERE, "Error al obtener tipo de cinta por nombre: " + nombre, e);
         }
         return null;
     }

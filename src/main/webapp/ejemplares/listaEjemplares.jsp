@@ -1,14 +1,13 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<%@page contentType="text/html" pageEncoding="UTF-8"%>
 <!DOCTYPE html>
 <html>
     <head>
         <title>Lista de Ejemplares</title>
-         <%@ include file='/cabecera.jsp' %>
+         <%@ include file="../header.jsp" %>
     </head>
     <body>
-        <jsp:include page="/menu.jsp"/>
-        <div class="container">
+
+        <div class="container mt-5">
             <div class="row">
                 <h3>Lista de Ejemplares</h3>
             </div>
@@ -20,10 +19,10 @@
                     <thead>
                         <tr>
                             <th>ID</th>
-                            <th>TÃ­tulo</th>
+                            <th>Título</th>
                             <th>Autor</th>
                             <th>Tipo de Documento</th>
-                            <th>UbicaciÃ³n</th>
+                            <th>Ubicación</th>
                             <th>Operaciones</th>
                         </tr>
                     </thead>
@@ -63,7 +62,7 @@
                            <c:set var="fracaso" value="" scope="session" />
                        </c:if>
          function eliminar(id){
-           alertify.confirm("Â¿Realmente desea eliminar este ejemplar?", function(e){
+           alertify.confirm("¿Realmente desea eliminar este ejemplar?", function(e){
               if(e){
                   location.href="ejemplares.do?op=eliminar&id="+ id;
               } 

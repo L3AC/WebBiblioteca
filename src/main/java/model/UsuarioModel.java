@@ -64,9 +64,9 @@ public class UsuarioModel extends Conexion {
         }
 
         String sql = """
-            INSERT INTO Usuarios (nombre, apellido, correo, contrasena, id_rol)
-            VALUES (?, ?, ?, ?, ?)
-            """;
+        INSERT INTO Usuarios (nombre, apellido, correo, contrasena, id_rol)
+        VALUES (?, ?, ?, ?, ?)
+        """;
 
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -78,8 +78,17 @@ public class UsuarioModel extends Conexion {
             String hash = BCrypt.hashpw(contrasenaPlana, BCrypt.gensalt());
             ps.setString(4, hash);
 
-            Long idRolLong = (Long) data.get("id_rol");
-            ps.setInt(5, idRolLong != null ? idRolLong.intValue() : 0);
+            Object idRolObj = data.get("id_rol");
+            int idRol = 0;
+            if (idRolObj instanceof Long) {
+                idRol = ((Long) idRolObj).intValue();
+            } else if (idRolObj instanceof String) {
+                idRol = Integer.parseInt((String) idRolObj);
+            } else if (idRolObj instanceof Integer) {
+                idRol = (Integer) idRolObj;
+            }
+
+            ps.setInt(5, idRol);
 
             int filas = ps.executeUpdate();
             if (filas > 0) {
@@ -93,6 +102,8 @@ public class UsuarioModel extends Conexion {
 
         } catch (SQLException e) {
             Logger.getLogger(UsuarioModel.class.getName()).log(Level.SEVERE, "Error al registrar usuario: " + correo, e);
+        } catch (NumberFormatException e) {
+            Logger.getLogger(UsuarioModel.class.getName()).log(Level.SEVERE, "Error al convertir id_rol a número: " + data.get("id_rol"), e);
         }
         return false;
     }
