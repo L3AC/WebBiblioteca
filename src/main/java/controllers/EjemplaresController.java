@@ -25,6 +25,7 @@ import model.TiposPeriodicoModel;
 import model.TiposRevistaModel;
 import utils.Validaciones;
 
+
 @WebServlet(name = "EjemplaresController", urlPatterns = {"/ejemplares.do"})
 public class EjemplaresController extends HttpServlet {
 
@@ -39,38 +40,40 @@ public class EjemplaresController extends HttpServlet {
     TiposPeriodicoModel tiposPeriodico = new TiposPeriodicoModel();
     TiposRevistaModel tiposRevista = new TiposRevistaModel();
 
-    protected void processRequest(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-        response.setContentType("text/html;charset=UTF-8");
-        try (PrintWriter out = response.getWriter()) {
-            if (request.getParameter("op") == null) {
-                listar(request, response);
-                return;
-            }
+protected void processRequest(HttpServletRequest request, HttpServletResponse response)
+        throws ServletException, IOException {
+    response.setContentType("text/html;charset=UTF-8");
+    try (PrintWriter out = response.getWriter()) {
+        if (request.getParameter("op") == null) {
+            listar(request, response);
+            return;
+        }
 
-            String operacion = request.getParameter("op");
+        String operacion = request.getParameter("op");
 
-            if ("listar".equals(operacion)) {
-                listar(request, response);
-            } else if ("nuevo".equals(operacion)) {
-                nuevo(request, response);
-            } else if ("insertar".equals(operacion)) {
-                insertar(request, response);
-            } else if ("obtener".equals(operacion)) {
-                obtener(request, response);
-            } else if ("modificar".equals(operacion)) {
-                modificar(request, response);
-            } else if ("eliminar".equals(operacion)) {
-                eliminar(request, response);
-            } else if ("detalles".equals(operacion)) {
-                detalles(request, response);
-            } else if ("crearCopias".equals(operacion)) {
-                crearCopias(request, response);
-            } else {
-                request.getRequestDispatcher("/error404.jsp").forward(request, response);
-            }
+        if ("listar".equals(operacion)) {
+            listar(request, response);
+        } else if ("buscar".equals(operacion)) { 
+            buscar(request, response);
+        } else if ("nuevo".equals(operacion)) {
+            nuevo(request, response);
+        } else if ("insertar".equals(operacion)) {
+            insertar(request, response);
+        } else if ("obtener".equals(operacion)) {
+            obtener(request, response);
+        } else if ("modificar".equals(operacion)) {
+            modificar(request, response);
+        } else if ("eliminar".equals(operacion)) {
+            eliminar(request, response);
+        } else if ("detalles".equals(operacion)) {
+            detalles(request, response);
+        } else if ("crearCopias".equals(operacion)) {
+            crearCopias(request, response);
+        } else {
+            request.getRequestDispatcher("/error404.jsp").forward(request, response);
         }
     }
+}
 
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     @Override
@@ -370,21 +373,58 @@ public class EjemplaresController extends HttpServlet {
         }
     }
 
-    private void detalles(HttpServletRequest request, HttpServletResponse response) {
-        try {
-            PrintWriter out = response.getWriter();
-            // int id = Integer.parseInt(request.getParameter("id"));
-            // Aquí puedes obtener el ejemplar y retornar JSON
-            // JSONObject json = new JSONObject();
-            // json.put("id", ejemplar.getId());
-            // json.put("titulo", ejemplar.getTitulo());
-            // ... más datos
-            // out.print(json);
-        } catch (IOException ex) {
-            Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, null, ex);
+    private void detalles(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // 1. Definimos el tipo de contenido ANTES de cualquier cosa
+        response.setContentType("application/json;charset=UTF-8");
+
+        // 2. Usamos try-with-resources para el PrintWriter
+        try (PrintWriter out = response.getWriter()) {
+            String idStr = request.getParameter("id");
+            JSONObject respuestaFinal = new JSONObject();
+
+            if (idStr == null || idStr.isEmpty()) {
+                respuestaFinal.put("error", "ID no proporcionado");
+                out.print(respuestaFinal.toJSONString());
+                return;
+            }
+
+            // 3. BLINDAJE TOTAL: Cualquier error aquí dentro se captura
+            try {
+                int id = Integer.parseInt(idStr);
+
+                // NOTA PARA TI: Si el error "NullPointerException" persiste, 
+                // el problema está DENTRO de modelo.obtenerPorId(id).
+                // Revisa que en tu Modelo no estés haciendo rs.getString("campo_nulo") sin verificar antes.
+                JSONObject ejemplar = modelo.obtenerPorId(id);
+
+                if (ejemplar != null) {
+                    // Si el ejemplar existe, buscamos sus copias
+                    List<JSONObject> copias = modelo.obtenerCopiasPorEjemplar(id);
+
+                    // Preparamos la respuesta exitosa
+                    respuestaFinal.put("success", true);
+                    respuestaFinal.put("datos", ejemplar);
+                    respuestaFinal.put("copias", copias != null ? copias : new ArrayList<>()); // Evitar null en copias
+                } else {
+                    respuestaFinal.put("error", "No se encontró el ejemplar con ID: " + id);
+                }
+
+            } catch (NumberFormatException e) {
+                respuestaFinal.put("error", "El ID proporcionado no es un número válido.");
+            } catch (NullPointerException e) {
+                // Capturamos específicamente el error de la imagen
+                Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "NPE al obtener detalles", e);
+                respuestaFinal.put("error", "Error de datos incoherentes en el servidor para este ejemplar.");
+            } catch (Exception e) {
+                Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "Error general en detalles", e);
+                respuestaFinal.put("error", "Error interno del servidor: " + e.getMessage());
+            }
+            out.print(respuestaFinal.toJSONString());
+
+        } catch (Exception ex) {
+            Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "Error fatal en controlador I/O", ex);
         }
     }
-
     // Nueva operación: crear copias adicionales para un ejemplar
     private void crearCopias(HttpServletRequest request, HttpServletResponse response) {
         PrintWriter out = null;
@@ -427,4 +467,34 @@ public class EjemplaresController extends HttpServlet {
             out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud: " + ex.getMessage() + "\"}");
         }
     }
+    
+    private void buscar(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    // IMPORTANTE: Cambiamos el tipo de contenido a JSON
+    response.setContentType("application/json;charset=UTF-8");
+    PrintWriter out = response.getWriter();
+    
+    String criterio = request.getParameter("criterio");
+    if (criterio == null) criterio = ""; 
+
+        try {
+            // Llamamos al modelo
+            List<JSONObject> lista = modelo.buscarEjemplares(criterio);
+
+            // Construimos el JSON manualmente
+            out.print("[");
+            for (int i = 0; i < lista.size(); i++) {
+                out.print(lista.get(i).toJSONString());
+                if (i < lista.size() - 1) {
+                    out.print(",");
+                }
+            }
+            out.print("]");
+        } catch (Exception ex) {
+            // Si falla, enviamos un array vacío para que no rompa el JS
+            Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, null, ex);
+            out.print("[]"); 
+        }
+    }
+    
+    
 }

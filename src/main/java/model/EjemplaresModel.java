@@ -1331,87 +1331,112 @@ public boolean eliminarEjemplar(int idEjemplar) {
         return lista;
     }
 
-    // === OBTENER EJEMPLAR POR ID (como JSON) ===
-    public JSONObject obtenerPorId(int idEjemplar) {
-        String sql = """
-        SELECT e.id_ejemplar, e.titulo, e.id_autor, e.ubicacion, e.tipo_documento, a.nombre_autor
-        FROM Ejemplares e
-        LEFT JOIN Autores a ON e.id_autor = a.id_autor
-        WHERE e.id_ejemplar = ?
-        """;
+public JSONObject obtenerPorId(int idEjemplar) {
+    String sql = """
+    SELECT e.id_ejemplar, e.titulo, e.id_autor, e.ubicacion, e.tipo_documento, a.nombre_autor
+    FROM Ejemplares e
+    LEFT JOIN Autores a ON e.id_autor = a.id_autor
+    WHERE e.id_ejemplar = ?
+    """;
 
-        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+    try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setInt(1, idEjemplar);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    JSONObject ejemplar = new JSONObject();
-                    ejemplar.put("id_ejemplar", rs.getInt("id_ejemplar"));
-                    ejemplar.put("titulo", rs.getString("titulo"));
-                    ejemplar.put("id_autor", rs.getObject("id_autor")); // Puede ser null
-                    ejemplar.put("ubicacion", rs.getString("ubicacion"));
-                    ejemplar.put("tipo_documento", rs.getString("tipo_documento"));
-                    ejemplar.put("nombre_autor", rs.getString("nombre_autor")); // Puede ser null
+        ps.setInt(1, idEjemplar);
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                JSONObject ejemplar = new JSONObject();
+                ejemplar.put("id_ejemplar", rs.getInt("id_ejemplar"));
+                ejemplar.put("titulo", rs.getString("titulo"));
+                ejemplar.put("id_autor", rs.getObject("id_autor"));
+                ejemplar.put("ubicacion", rs.getString("ubicacion"));
+                String tipoDoc = rs.getString("tipo_documento");
+                ejemplar.put("tipo_documento", tipoDoc);
+                ejemplar.put("nombre_autor", rs.getString("nombre_autor"));
 
-                    // Cargar datos específicos según tipo
-                    JSONObject datosEspecificos = obtenerDatosEspecificosPorId(conn, idEjemplar, rs.getString("tipo_documento"));
+                // --- BLINDAJE AQUÍ ---
+                // Si esto falla por un dato malo en la tabla hija (ej. duración inválida),
+                // capturamos el error para que NO rompa la carga principal.
+                try {
+                    JSONObject datosEspecificos = obtenerDatosEspecificosPorId(conn, idEjemplar, tipoDoc);
                     if (datosEspecificos != null) {
                         ejemplar.putAll(datosEspecificos);
                     }
-
-                    return ejemplar;
+                } catch (Exception ex) {
+                    // Solo imprimimos el error en consola, pero permitimos que continúe
+                    System.err.println("Advertencia: No se pudieron cargar detalles específicos para ID " + idEjemplar + ": " + ex.getMessage());
                 }
+                // ---------------------
+
+                return ejemplar;
             }
-
-        } catch (SQLException e) {
-            Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al obtener ejemplar por ID: " + idEjemplar, e);
         }
-        return null;
-    }
 
-    // === OBTENER DATOS ESPECÍFICOS POR ID EJEMPLAR Y TIPO ===
+    } catch (SQLException e) {
+        Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error al obtener ejemplar por ID: " + idEjemplar, e);
+    }
+    return null;
+}
+
+
     private JSONObject obtenerDatosEspecificosPorId(Connection conn, int idEjemplar, String tipoDocumento) throws SQLException {
         JSONObject datos = new JSONObject();
 
         if ("Libro".equals(tipoDocumento)) {
-            String sql = """
-            SELECT isbn, id_editorial, id_genero, edicion
-            FROM Libros
-            WHERE id_ejemplar = ?
-            """;
+            String sql = "SELECT l.isbn, l.id_editorial, e.nombre_editorial, l.id_genero, g.nombre_genero, l.edicion " +
+                    "FROM Libros l " +
+                    "LEFT JOIN Editoriales e ON l.id_editorial = e.id_editorial " +
+                    "LEFT JOIN Generos g ON l.id_genero = g.id_genero " +
+                    "WHERE l.id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         datos.put("isbn", rs.getString("isbn"));
                         datos.put("id_editorial", rs.getObject("id_editorial"));
+                        datos.put("nombre_editorial", rs.getString("nombre_editorial"));
                         datos.put("id_genero", rs.getObject("id_genero"));
+                        datos.put("nombre_genero", rs.getString("nombre_genero"));
                         datos.put("edicion", rs.getObject("edicion"));
                     }
                 }
             }
         } else if ("Diccionario".equals(tipoDocumento)) {
-            String sql = """
-            SELECT isbn, idioma, volumen
-            FROM Diccionarios
-            WHERE id_ejemplar = ?
-            """;
+            String sql = "SELECT d.isbn, d.id_editorial, e.nombre_editorial, d.idioma, d.volumen " +
+                    "FROM Diccionarios d " +
+                    "LEFT JOIN Editoriales e ON d.id_editorial = e.id_editorial " +
+                    "WHERE d.id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         datos.put("isbn", rs.getString("isbn"));
+                        datos.put("id_editorial", rs.getObject("id_editorial"));
+                        datos.put("nombre_editorial", rs.getString("nombre_editorial"));
                         datos.put("idioma", rs.getString("idioma"));
                         datos.put("volumen", rs.getObject("volumen"));
                     }
                 }
             }
+        } else if ("DVD".equals(tipoDocumento) || "VHS".equals(tipoDocumento) || "CD".equals(tipoDocumento)) {
+            String tabla = "DVD".equals(tipoDocumento) ? "DVDs" : "VHS".equals(tipoDocumento) ? "VHS" : "CDs";
+            String sql = "SELECT m.duracion, m.id_genero, g.nombre_genero " +
+                    "FROM " + tabla + " m " +
+                    "LEFT JOIN Generos g ON m.id_genero = g.id_genero " +
+                    "WHERE m.id_ejemplar = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        // IMPORTANTE: Convertir Time a String
+                        Time duracion = rs.getTime("duracion");
+                        datos.put("duracion", duracion != null ? duracion.toString() : "");
+                        datos.put("id_genero", rs.getObject("id_genero"));
+                        datos.put("nombre_genero", rs.getString("nombre_genero"));
+                    }
+                }
+            }
         } else if ("Mapas".equals(tipoDocumento)) {
-            String sql = """
-            SELECT escala, tipo_mapa
-            FROM Mapas
-            WHERE id_ejemplar = ?
-            """;
+            String sql = "SELECT escala, tipo_mapa FROM Mapas WHERE id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -1422,57 +1447,62 @@ public boolean eliminarEjemplar(int idEjemplar) {
                 }
             }
         } else if ("Tesis".equals(tipoDocumento)) {
-            String sql = """
-            SELECT grado_academico, facultad
-            FROM Tesis
-            WHERE id_ejemplar = ?
-            """;
+        String sql = "SELECT grado_academico, facultad FROM Tesis WHERE id_ejemplar = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idEjemplar);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    datos.put("facultad", rs.getString("facultad"));
+                    datos.put("grado_academico", rs.getString("grado_academico"));
+                }
+            }
+        }
+    }else if ("Revistas".equals(tipoDocumento)) {
+            String sql = "SELECT r.fecha_publicacion, r.id_tipo_revista, r.id_genero, g.nombre_genero " +
+                    "FROM Revistas r " +
+                    "LEFT JOIN Generos g ON r.id_genero = g.id_genero " +
+                    "WHERE r.id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        datos.put("grado_academico", rs.getString("grado_academico"));
-                        datos.put("facultad", rs.getString("facultad"));
+                        // IMPORTANTE: Convertir Date a String
+                        java.util.Date fecha = rs.getDate("fecha_publicacion");
+                        datos.put("fecha_publicacion", fecha != null ? fecha.toString() : "");
+                        datos.put("id_tipo_revista", rs.getObject("id_tipo_revista"));
+                        datos.put("id_genero", rs.getObject("id_genero"));
+                        datos.put("nombre_genero", rs.getString("nombre_genero"));
                     }
                 }
             }
-        } else if ("DVD".equals(tipoDocumento) || "VHS".equals(tipoDocumento) || "CD".equals(tipoDocumento)) {
-            String tabla = "DVD".equals(tipoDocumento) ? "DVDs" : "VHS".equals(tipoDocumento) ? "VHS" : "CDs";
-            String sql = """
-            SELECT duracion, id_genero
-            FROM """ + tabla + """
-            WHERE id_ejemplar = ?
-            """;
+        } else if ("Periodicos".equals(tipoDocumento)) {
+            String sql = "SELECT fecha_publicacion, id_tipo_periodico FROM Periodicos WHERE id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        datos.put("duracion", rs.getTime("duracion"));
-                        datos.put("id_genero", rs.getObject("id_genero"));
+                        // IMPORTANTE: Convertir Date a String
+                        java.util.Date fecha = rs.getDate("fecha_publicacion");
+                        datos.put("fecha_publicacion", fecha != null ? fecha.toString() : "");
+                        datos.put("id_tipo_periodico", rs.getObject("id_tipo_periodico"));
                     }
                 }
             }
         } else if ("Cassettes".equals(tipoDocumento)) {
-            String sql = """
-            SELECT duracion, id_tipo_cinta
-            FROM Cassettes
-            WHERE id_ejemplar = ?
-            """;
+            String sql = "SELECT duracion, id_tipo_cinta FROM Cassettes WHERE id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        datos.put("duracion", rs.getTime("duracion"));
+                        // IMPORTANTE: Convertir Time a String
+                        Time duracion = rs.getTime("duracion");
+                        datos.put("duracion", duracion != null ? duracion.toString() : "");
                         datos.put("id_tipo_cinta", rs.getObject("id_tipo_cinta"));
                     }
                 }
             }
         } else if ("Documento".equals(tipoDocumento)) {
-            String sql = """
-            SELECT id_tipo_detalle
-            FROM Documentos
-            WHERE id_ejemplar = ?
-            """;
+            String sql = "SELECT id_tipo_detalle FROM Documentos WHERE id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -1481,39 +1511,44 @@ public boolean eliminarEjemplar(int idEjemplar) {
                     }
                 }
             }
-        } else if ("Periodicos".equals(tipoDocumento)) {
-            String sql = """
-            SELECT fecha_publicacion, id_tipo_periodico
-            FROM Periodicos
-            WHERE id_ejemplar = ?
-            """;
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, idEjemplar);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        datos.put("fecha_publicacion", rs.getDate("fecha_publicacion"));
-                        datos.put("id_tipo_periodico", rs.getObject("id_tipo_periodico"));
-                    }
-                }
-            }
-        } else if ("Revistas".equals(tipoDocumento)) {
-            String sql = """
-            SELECT fecha_publicacion, id_tipo_revista, id_genero
-            FROM Revistas
-            WHERE id_ejemplar = ?
-            """;
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, idEjemplar);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        datos.put("fecha_publicacion", rs.getDate("fecha_publicacion"));
-                        datos.put("id_tipo_revista", rs.getObject("id_tipo_revista"));
-                        datos.put("id_genero", rs.getObject("id_genero"));
-                    }
-                }
-            }
         }
 
         return datos.isEmpty() ? null : datos;
     }
+    public List<JSONObject> buscarEjemplares(String criterio) {
+       List<JSONObject> lista = new ArrayList<>();
+       // Esta consulta busca en título, autor o tipo, y cuenta las copias disponibles
+       String sql = "SELECT e.id_ejemplar, e.titulo, e.tipo_documento, e.ubicacion, a.nombre_autor, " +
+                    "(SELECT COUNT(*) FROM Copias c WHERE c.id_ejemplar = e.id_ejemplar AND c.estado = 'Disponible') as disponibles " +
+                    "FROM Ejemplares e " +
+                    "LEFT JOIN Autores a ON e.id_autor = a.id_autor " +
+                    "WHERE e.titulo LIKE ? OR a.nombre_autor LIKE ? OR e.tipo_documento LIKE ? " +
+                    "ORDER BY e.titulo LIMIT 50";
+
+       try (Connection conn = getConnection(); 
+            PreparedStatement ps = conn.prepareStatement(sql)) {
+
+           String busqueda = "%" + criterio + "%";
+           ps.setString(1, busqueda);
+           ps.setString(2, busqueda);
+           ps.setString(3, busqueda);
+
+           try (ResultSet rs = ps.executeQuery()) {
+               while (rs.next()) {
+                   JSONObject ejemplar = new JSONObject();
+                   ejemplar.put("id_ejemplar", rs.getInt("id_ejemplar"));
+                   ejemplar.put("titulo", rs.getString("titulo"));
+                   ejemplar.put("tipo_documento", rs.getString("tipo_documento"));
+                   ejemplar.put("ubicacion", rs.getString("ubicacion"));
+                   ejemplar.put("nombre_autor", rs.getString("nombre_autor") != null ? rs.getString("nombre_autor") : "Anónimo");
+                   ejemplar.put("disponibles", rs.getInt("disponibles"));
+
+                   lista.add(ejemplar);
+               }
+           }
+       } catch (SQLException e) {
+           Logger.getLogger(EjemplaresModel.class.getName()).log(Level.SEVERE, "Error en búsqueda", e);
+       }
+       return lista;
+   }
 }
