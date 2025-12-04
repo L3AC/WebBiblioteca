@@ -26,10 +26,6 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-block" style="background-color: #1a428a; border:none;">Ingresar</button>
                 </form>
-
-                <div class="text-center" style="margin-top: 15px;">
-                    <a href="${contextPath}/registro.jsp">¿No tienes cuenta? Regístrate</a>
-                </div>
             </div>
         </div>
     </div>
