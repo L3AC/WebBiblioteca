@@ -1,4 +1,3 @@
-
 body {
     background-color: #5b87a3; /* Azul grisáceo de fondo según la imagen */
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -8,43 +7,92 @@ body {
 
 /* --- NAVBAR PERSONALIZADO --- */
 .navbar-custom {
-    background-color: #5b87a3; /* Mismo color del fondo o un tono ligeramente diferente */
+    background-color: #2c3e50;
     border: none;
-    min-height: 70px;
-    box-shadow: none; /* Quitamos sombras para que se vea plano como en la imagen */
+    min-height: 60px; /* Reducido de 70px a 60px para hacerlo más pequeño */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
+/* Ajuste del Logo y Texto (Navbar Brand) */
 .navbar-custom .navbar-brand {
-    padding: 10px 15px;
-    height: auto;
+    padding: 0 15px; /* Quitamos padding vertical para usar Flexbox */
+    height: 60px;    /* Misma altura que el header */
+    display: flex;   /* Magia para centrar */
+    align-items: center; /* Centra verticalmente el contenido */
+}
+
+/* Contenedor interno para asegurar alineación imagen-texto */
+.navbar-custom .navbar-brand .brand-content {
+    display: flex;
+    align-items: center;
 }
 
 .navbar-custom .navbar-brand img {
-    height: 50px; /* Ajuste del logo */
-    display: inline-block;
+    height: 35px; /* Logo un poco más pequeño para caber en 60px */
+    width: auto;
+    margin-right: 10px;
 }
 
-.navbar-custom .navbar-brand span {
+.navbar-custom .navbar-brand .brand-text span {
     display: block;
-    color: #1a428a; /* Azul oscuro UDB */
+    color: #ffffff;
     font-weight: bold;
     font-size: 12px;
-    line-height: 1.2;
-    margin-top: 5px;
+    line-height: 1.1; /* Texto más compacto */
 }
 
+/* --- BOTONES DEL MENÚ --- */
 .navbar-custom .navbar-nav > li > a {
-    color: #000; /* Texto negro para el menú */
+    color: #ffffff;
     font-weight: bold;
-    font-size: 16px;
-    padding-top: 25px;
-    padding-bottom: 25px;
+    font-size: 14px; /* Un poco más pequeño para elegancia */
+
+    /* Centrado Vertical Perfecto */
+    height: 60px; /* Forzamos la altura del header */
+    display: flex;
+    align-items: center; /* Esto es lo que hace que el texto baje al centro */
+    padding: 0 15px;
+
+    /* Transición suave */
+    transition: background-color 0.3s, color 0.3s;
 }
 
-.navbar-custom .navbar-nav > li > a:hover {
-    color: #333;
-    background-color: transparent;
-    text-decoration: underline;
+.navbar-custom .navbar-nav > li > a:hover,
+.navbar-custom .navbar-nav > li > a:focus,
+.navbar-custom .navbar-nav .open > a {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1); /* Fondo sutil al pasar el mouse */
+}
+
+/* Ajuste del botón hamburguesa para móvil */
+.navbar-custom .navbar-toggle {
+    margin-top: 13px; /* Calculado: (60px header - 34px botón) / 2 */
+    margin-bottom: 13px;
+    border-color: rgba(255,255,255,0.5);
+}
+
+.navbar-custom .navbar-toggle .icon-bar {
+    background-color: #fff;
+}
+
+/* Ajuste del Dropdown (Submenú) */
+.dropdown-menu {
+    border: none;
+    border-radius: 0 0 5px 5px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+/* Ajustes para móvil */
+@media (max-width: 767px) {
+    .navbar-custom .navbar-nav > li > a {
+        height: auto; /* En móvil dejamos que la altura sea automática */
+        display: block;
+        padding: 15px;
+    }
+
+    .navbar-custom .navbar-collapse {
+        border-color: rgba(255, 255, 255, 0.1);
+    }
 }
 
 /* --- ESTILOS DE BÚSQUEDA (INDEX) --- */
@@ -117,4 +165,90 @@ body {
     padding: 30px;
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     margin-top: 50px;
+}
+
+/* --- TABLAS PERSONALIZADAS --- */
+
+.table-custom {
+
+    background-color: #ffffff; /* Fondo blanco puro */
+
+    border-collapse: separate;
+
+    border-spacing: 0;
+
+    border-radius: 8px;
+
+    overflow: hidden;
+
+    width: 100%;
+
+    margin-bottom: 20px;
+
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1); /* Sombra suave */
+
+}
+
+
+
+.table-custom thead tr {
+
+    background-color: #2c3e50; /* Encabezado oscuro */
+
+    color: #fff;
+
+}
+
+
+
+.table-custom th {
+
+    padding: 15px !important;
+
+    text-transform: uppercase;
+
+    font-size: 14px;
+
+    letter-spacing: 0.05em;
+
+    border-bottom: none !important;
+
+    text-align: center; /* Centrar encabezados */
+
+}
+
+
+
+.table-custom td {
+
+    padding: 15px !important;
+
+    font-size: 15px;
+
+    vertical-align: middle !important;
+
+    border-top: 1px solid #dee2e6;
+
+    color: #333;
+
+    text-align: center; /* Centrar datos */
+
+}
+
+
+
+.table-custom tbody tr {
+
+    background-color: #ffffff; /* Filas blancas */
+
+    transition: background-color 0.2s;
+
+}
+
+
+
+.table-custom tbody tr:hover {
+
+    background-color: #f1f1f1; /* Gris muy claro al pasar el mouse */
+
 }
