@@ -85,7 +85,7 @@
                     <div class="result-card">
                         <span class="glyphicon glyphicon-search icon-large"></span>
                         <div class="result-title" style="font-size: 20px;">Catálogo Público</div>
-                        <div class="result-type">Explorar libros disponibles</div>
+                        <div class="result-type">Explorar ejemplares disponibles</div>
                     </div>
                 </a>
             </div>
@@ -95,10 +95,10 @@
     <c:if test="${not empty sessionScope.usuario and sessionScope.usuario.rol.nombre_rol ne 'Administrador'}">
         <div class="row">
             <div class="col-md-4">
-                <a href="${contextPath}/libros.do?op=listar" class="dashboard-item">
+                <a href="${contextPath}/catalogos.jsp" class="dashboard-item">
                     <div class="result-card">
                         <span class="glyphicon glyphicon-book icon-large"></span>
-                        <div class="result-title">Catálogo de Libros</div>
+                        <div class="result-title">Catálogo</div>
                         <div class="result-type">Buscar y reservar</div>
                     </div>
                 </a>

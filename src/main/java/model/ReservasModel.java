@@ -1,8 +1,8 @@
 package model;
 
 import java.sql.*;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.json.simple.JSONObject;
@@ -10,179 +10,116 @@ import static utils.ConexionBD.getConnection;
 
 public class ReservasModel extends Conexion {
 
-    // === RESERVAR UNA COPIA ===
-    public boolean reservarCopia(int idCopia, String correoUsuario) {
+    // Crear una reserva
+    public boolean reservarCopia(int idCopia, int idUsuario) {
         Connection conn = null;
         try {
             conn = getConnection();
-            conn.setAutoCommit(false);
+            conn.setAutoCommit(false); // Transacción
 
-            // Obtener ID del usuario por correo
-            String sqlUsuario = "SELECT id_usuario FROM Usuarios WHERE correo = ?";
-            int idUsuario = -1;
-            try (PreparedStatement psUsuario = conn.prepareStatement(sqlUsuario)) {
-                psUsuario.setString(1, correoUsuario);
-                try (ResultSet rs = psUsuario.executeQuery()) {
-                    if (rs.next()) {
-                        idUsuario = rs.getInt("id_usuario");
-                    } else {
-                        Logger.getLogger(ReservasModel.class.getName()).log(Level.WARNING, "Usuario no encontrado con correo: {0}", correoUsuario);
-                        return false;
-                    }
-                }
+            // 1. Verificar disponibilidad
+            String sqlCheck = "SELECT estado FROM Copias WHERE id_copia = ? AND estado = 'Disponible'";
+            try (PreparedStatement ps = conn.prepareStatement(sqlCheck)) {
+                ps.setInt(1, idCopia);
+                ResultSet rs = ps.executeQuery();
+                if (!rs.next()) return false; // No está disponible
             }
 
-            // Verificar que la copia esté disponible
-            String sqlCopia = "SELECT estado FROM Copias WHERE id_copia = ?";
-            try (PreparedStatement psCopia = conn.prepareStatement(sqlCopia)) {
-                psCopia.setInt(1, idCopia);
-                try (ResultSet rs = psCopia.executeQuery()) {
-                    if (!rs.next()) {
-                        Logger.getLogger(ReservasModel.class.getName()).log(Level.WARNING, "Copia no encontrada con ID: {0}", idCopia);
-                        return false;
-                    }
-                    String estado = rs.getString("estado");
-                    if (!"Disponible".equals(estado)) {
-                        Logger.getLogger(ReservasModel.class.getName()).log(Level.WARNING, "Copia {0} no está disponible para reserva. Estado actual: {1}", new Object[]{idCopia, estado});
-                        return false;
-                    }
-                }
+            // 2. Insertar Reserva
+            String sqlInsert = "INSERT INTO Reservas (id_usuario, id_copia, fecha_reserva) VALUES (?, ?, NOW())";
+            try (PreparedStatement ps = conn.prepareStatement(sqlInsert)) {
+                ps.setInt(1, idUsuario);
+                ps.setInt(2, idCopia);
+                ps.executeUpdate();
             }
 
-            // Insertar en Reservas
-            String sqlReserva = "INSERT INTO Reservas (id_usuario, id_copia, fecha_reserva) VALUES (?, ?, ?)";
-            try (PreparedStatement psReserva = conn.prepareStatement(sqlReserva, Statement.RETURN_GENERATED_KEYS)) {
-                psReserva.setInt(1, idUsuario);
-                psReserva.setInt(2, idCopia);
-                psReserva.setDate(3, new Date(System.currentTimeMillis()));
-                psReserva.executeUpdate();
-            }
-
-            // Actualizar estado de la copia a "Reservado"
-            String sqlActualizarCopia = "UPDATE Copias SET estado = 'Reservado' WHERE id_copia = ?";
-            try (PreparedStatement psActualizar = conn.prepareStatement(sqlActualizarCopia)) {
-                psActualizar.setInt(1, idCopia);
-                psActualizar.executeUpdate();
+            // 3. Actualizar estado de la copia
+            String sqlUpdate = "UPDATE Copias SET estado = 'Reservado' WHERE id_copia = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sqlUpdate)) {
+                ps.setInt(1, idCopia);
+                ps.executeUpdate();
             }
 
             conn.commit();
-            Logger.getLogger(ReservasModel.class.getName()).log(Level.INFO, "Copia {0} reservada exitosamente para usuario {1}", new Object[]{idCopia, correoUsuario});
             return true;
-
         } catch (SQLException e) {
-            if (conn != null) {
-                try {
-                    conn.rollback();
-                } catch (SQLException ex) {
-                    Logger.getLogger(ReservasModel.class.getName()).log(Level.SEVERE, "Error en rollback", ex);
-                }
-            }
-            Logger.getLogger(ReservasModel.class.getName()).log(Level.SEVERE, "Error al reservar copia", e);
+            if(conn!=null) try{conn.rollback();}catch(Exception ex){}
+            Logger.getLogger(ReservasModel.class.getName()).log(Level.SEVERE, null, e);
             return false;
         } finally {
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) {
-                    Logger.getLogger(ReservasModel.class.getName()).log(Level.WARNING, "Error al cerrar conexión", e);
-                }
-            }
+            if(conn!=null) try{conn.setAutoCommit(true);conn.close();}catch(Exception ex){}
         }
     }
 
-    // === LISTAR RESERVAS (opcional) ===
-    public List<JSONObject> listarReservas() {
+    // Listar reservas (Filtra por usuario si no es admin)
+    public List<JSONObject> listarReservas(int idUsuario, boolean esAdmin) {
         List<JSONObject> lista = new ArrayList<>();
-        String sql = """
-            SELECT r.id_reserva, r.fecha_reserva, u.correo, c.codigo_unico, e.titulo
-            FROM Reservas r
-            JOIN Usuarios u ON r.id_usuario = u.id_usuario
-            JOIN Copias c ON r.id_copia = c.id_copia
-            JOIN Ejemplares e ON c.id_ejemplar = e.id_ejemplar
-            ORDER BY r.id_reserva
-            """;
+        String sql = "SELECT r.id_reserva, r.fecha_reserva, c.codigo_unico, e.titulo, u.nombre, u.apellido " +
+                "FROM Reservas r " +
+                "JOIN Copias c ON r.id_copia = c.id_copia " +
+                "JOIN Ejemplares e ON c.id_ejemplar = e.id_ejemplar " +
+                "JOIN Usuarios u ON r.id_usuario = u.id_usuario ";
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-
-            while (rs.next()) {
-                JSONObject reserva = new JSONObject();
-                reserva.put("id_reserva", rs.getInt("id_reserva"));
-                reserva.put("fecha_reserva", rs.getDate("fecha_reserva").toString());
-                reserva.put("correo_usuario", rs.getString("correo"));
-                reserva.put("codigo_copia", rs.getString("codigo_unico"));
-                reserva.put("titulo_ejemplar", rs.getString("titulo"));
-
-                lista.add(reserva);
-            }
-
-        } catch (SQLException e) {
-            Logger.getLogger(ReservasModel.class.getName()).log(Level.SEVERE, "Error al listar reservas", e);
+        if (!esAdmin) {
+            sql += "WHERE r.id_usuario = ? ";
         }
+        sql += "ORDER BY r.fecha_reserva DESC";
+
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (!esAdmin) ps.setInt(1, idUsuario);
+
+            ResultSet rs = ps.executeQuery();
+            while (rs.next()) {
+                JSONObject obj = new JSONObject();
+                obj.put("id_reserva", rs.getInt("id_reserva"));
+                obj.put("fecha", rs.getString("fecha_reserva"));
+                obj.put("codigo", rs.getString("codigo_unico"));
+                obj.put("titulo", rs.getString("titulo"));
+                obj.put("usuario", rs.getString("nombre") + " " + rs.getString("apellido"));
+                lista.add(obj);
+            }
+        } catch (Exception e) { e.printStackTrace(); }
         return lista;
     }
 
-    // === CANCELAR RESERVA ===
+    // Cancelar reserva
     public boolean cancelarReserva(int idReserva) {
         Connection conn = null;
         try {
             conn = getConnection();
             conn.setAutoCommit(false);
 
-            // Obtener ID de copia de la reserva
-            int idCopia = -1;
-            String sqlReserva = "SELECT id_copia FROM Reservas WHERE id_reserva = ?";
-            try (PreparedStatement psReserva = conn.prepareStatement(sqlReserva)) {
-                psReserva.setInt(1, idReserva);
-                try (ResultSet rs = psReserva.executeQuery()) {
-                    if (rs.next()) {
-                        idCopia = rs.getInt("id_copia");
-                    } else {
-                        Logger.getLogger(ReservasModel.class.getName()).log(Level.WARNING, "Reserva no encontrada con ID: {0}", idReserva);
-                        return false;
-                    }
-                }
+            // Obtener id_copia
+            int idCopia = 0;
+            String sqlGet = "SELECT id_copia FROM Reservas WHERE id_reserva = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlGet)){
+                ps.setInt(1, idReserva);
+                ResultSet rs = ps.executeQuery();
+                if(rs.next()) idCopia = rs.getInt("id_copia");
+                else return false;
             }
 
-            // Eliminar la reserva
-            String sqlEliminar = "DELETE FROM Reservas WHERE id_reserva = ?";
-            try (PreparedStatement psEliminar = conn.prepareStatement(sqlEliminar)) {
-                psEliminar.setInt(1, idReserva);
-                psEliminar.executeUpdate();
+            // Borrar reserva
+            String sqlDel = "DELETE FROM Reservas WHERE id_reserva = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlDel)){
+                ps.setInt(1, idReserva);
+                ps.executeUpdate();
             }
 
-            // Actualizar estado de la copia a "Disponible"
-            String sqlActualizarCopia = "UPDATE Copias SET estado = 'Disponible' WHERE id_copia = ?";
-            try (PreparedStatement psActualizar = conn.prepareStatement(sqlActualizarCopia)) {
-                psActualizar.setInt(1, idCopia);
-                psActualizar.executeUpdate();
+            // Liberar copia
+            String sqlUp = "UPDATE Copias SET estado = 'Disponible' WHERE id_copia = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlUp)){
+                ps.setInt(1, idCopia);
+                ps.executeUpdate();
             }
 
             conn.commit();
-            Logger.getLogger(ReservasModel.class.getName()).log(Level.INFO, "Reserva {0} cancelada exitosamente", idReserva);
             return true;
-
         } catch (SQLException e) {
-            if (conn != null) {
-                try {
-                    conn.rollback();
-                } catch (SQLException ex) {
-                    Logger.getLogger(ReservasModel.class.getName()).log(Level.SEVERE, "Error en rollback", ex);
-                }
-            }
-            Logger.getLogger(ReservasModel.class.getName()).log(Level.SEVERE, "Error al cancelar reserva", e);
+            if(conn!=null) try{conn.rollback();}catch(Exception ex){}
             return false;
         } finally {
-            if (conn != null) {
-                try {
-                    conn.setAutoCommit(true);
-                    conn.close();
-                } catch (SQLException e) {
-                    Logger.getLogger(ReservasModel.class.getName()).log(Level.WARNING, "Error al cerrar conexión", e);
-                }
-            }
+            if(conn!=null) try{conn.setAutoCommit(true);conn.close();}catch(Exception ex){}
         }
     }
 }
