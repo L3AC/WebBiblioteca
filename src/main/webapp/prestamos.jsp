@@ -13,6 +13,18 @@
         <div class="col-md-12">
             <h3><span class="glyphicon glyphicon-list-alt"></span> Gestión de Préstamos</h3>
             <hr>
+            
+            <c:if test="${sessionScope.usuario.rol.nombre_rol eq 'Administrador'}">
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-addon"><i class="glyphicon glyphicon-search"></i></span>
+                            <input type="text" id="searchPrestamos" class="form-control" placeholder="Buscar préstamo...">
+                        </div>
+                    </div>
+                </div>
+            </c:if>
+
             <div class="table-responsive">
                 <table class="table table-custom">
                     <thead>
@@ -27,6 +39,9 @@
                         <th>F. Devolución</th>
                         <th>Mora</th>
                         <th>Estado</th>
+                        <c:if test="${sessionScope.usuario.rol.nombre_rol eq 'Administrador'}">
+                            <th>Acciones</th>
+                        </c:if>
                     </tr>
                     </thead>
                     <tbody id="bodyPrestamos"></tbody>
@@ -37,7 +52,16 @@
 </div>
 
 <script>
-    $(document).ready(function() { cargarPrestamos(); });
+    $(document).ready(function() { 
+        cargarPrestamos(); 
+        
+        $("#searchPrestamos").on("keyup", function() {
+            var value = $(this).val().toLowerCase();
+            $("#bodyPrestamos tr").filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+            });
+        });
+    });
 
     function cargarPrestamos() {
         $.ajax({
@@ -46,10 +70,10 @@
             dataType: 'json',
             success: function(data) {
                 let html = '';
-                let isAdmin = ${sessionScope.usuario.rol.nombre_rol eq 'Administrador'};
+                let isAdmin = ${sessionScope.usuario.rol.nombre_rol eq 'Administrador' ? 'true' : 'false'};
 
                 if(data.length === 0) {
-                    let colSpan = isAdmin ? 8 : 7;
+                    let colSpan = isAdmin ? 9 : 7;
                     html = '<tr><td colspan="' + colSpan + '" class="text-center">No hay préstamos registrados.</td></tr>';
                 } else {
                     data.forEach(p => {
@@ -77,15 +101,41 @@
                         html += '<td>' + p.fecha_inicio + '</td>' +
                                 '<td>' + fechaDev + '</td>' +
                                 '<td>' + moraHtml + '</td>' +
-                                '<td>' + estadoHtml + '</td>' +
-                                '</tr>';
+                                '<td>' + estadoHtml + '</td>';
+
+                        if(isAdmin) {
+                             if(p.estado === 'Activo' || p.estado === 'Mora') {
+                                 html += '<td><button class="btn btn-primary btn-sm" onclick="devolverPrestamo('+p.id+')">Devolver</button></td>';
+                             } else {
+                                 html += '<td><span class="label label-default">Completado</span></td>';
+                             }
+                        }
+
+                        html += '</tr>';
                     });
                 }
                 $('#bodyPrestamos').html(html);
             },
             error: function(err) {
                 console.error("Error cargando préstamos", err);
-                $('#bodyPrestamos').html('<tr><td colspan="8" class="text-center text-danger">Error al cargar los datos.</td></tr>');
+                $('#bodyPrestamos').html('<tr><td colspan="9" class="text-center text-danger">Error al cargar los datos.</td></tr>');
+            }
+        });
+    }
+
+    function devolverPrestamo(id) {
+        alertify.confirm("¿Registrar devolución del libro?", function(e){
+            if(e){
+                $.ajax({
+                    url: '${contextPath}/prestamos.do?op=devolver',
+                    type: 'POST',
+                    data: { idPrestamo: id },
+                    dataType: 'json',
+                    success: function(resp) {
+                        if(resp.success) { alertify.success(resp.message); cargarPrestamos(); }
+                        else alertify.error(resp.message);
+                    }
+                });
             }
         });
     }

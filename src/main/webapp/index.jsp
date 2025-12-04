@@ -137,26 +137,6 @@
 
         <div class="row">
             <div class="col-md-3 col-sm-6">
-                <a href="${contextPath}/libros.do?op=listar" class="dashboard-item">
-                    <div class="result-card">
-                        <span class="glyphicon glyphicon-book icon-large"></span>
-                        <div class="result-title">Libros</div>
-                        <div class="result-type">Administrar catálogo</div>
-                    </div>
-                </a>
-            </div>
-
-            <div class="col-md-3 col-sm-6">
-                <a href="${contextPath}/ejemplares.do?op=listar" class="dashboard-item">
-                    <div class="result-card">
-                        <span class="glyphicon glyphicon-duplicate icon-large"></span>
-                        <div class="result-title">Ejemplares</div>
-                        <div class="result-type">Gestión de copias</div>
-                    </div>
-                </a>
-            </div>
-
-            <div class="col-md-3 col-sm-6">
                 <a href="${contextPath}/usuarios.do?op=listar" class="dashboard-item">
                     <div class="result-card">
                         <span class="glyphicon glyphicon-user icon-large"></span>
@@ -175,9 +155,17 @@
                     </div>
                 </a>
             </div>
-        </div>
-        
-        <div class="row" style="margin-top: 15px;">
+
+            <div class="col-md-3 col-sm-6">
+                <a href="${contextPath}/ejemplares.do?op=listar" class="dashboard-item">
+                    <div class="result-card">
+                        <span class="glyphicon glyphicon-duplicate icon-large"></span>
+                        <div class="result-title">Ejemplares</div>
+                        <div class="result-type">Gestión de copias</div>
+                    </div>
+                </a>
+            </div>
+
             <div class="col-md-3 col-sm-6">
                 <a href="${contextPath}/autores.do?op=listar" class="dashboard-item">
                     <div class="result-card">
@@ -186,7 +174,9 @@
                     </div>
                 </a>
             </div>
-            
+        </div>
+        
+        <div class="row" style="margin-top: 15px;">
             <div class="col-md-3 col-sm-6">
                 <a href="${contextPath}/editoriales.do?op=listar" class="dashboard-item">
                     <div class="result-card">
@@ -210,6 +200,28 @@
                     <div class="result-card">
                         <span class="glyphicon glyphicon-file icon-large"></span>
                         <div class="result-title">Tipos Doc.</div>
+                    </div>
+                </a>
+            </div>
+
+            <div class="col-md-3 col-sm-6">
+                <a href="${contextPath}/reservas.jsp" class="dashboard-item">
+                    <div class="result-card">
+                        <span class="glyphicon glyphicon-bookmark icon-large"></span>
+                        <div class="result-title">Reservas</div>
+                        <div class="result-type">Gestionar reservas</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="row" style="margin-top: 15px;">
+            <div class="col-md-3 col-sm-6">
+                <a href="${contextPath}/prestamos.jsp" class="dashboard-item">
+                    <div class="result-card">
+                        <span class="glyphicon glyphicon-list-alt icon-large"></span>
+                        <div class="result-title">Préstamos</div>
+                        <div class="result-type">Gestionar préstamos</div>
                     </div>
                 </a>
             </div>

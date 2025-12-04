@@ -51,10 +51,64 @@ public class ReservasModel extends Conexion {
         }
     }
 
+    // Aceptar reserva (Convertir en préstamo)
+    public boolean aceptarReserva(int idReserva) {
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            conn.setAutoCommit(false);
+
+            int idCopia = 0;
+            int idUsuario = 0;
+
+            // 1. Obtener datos de la reserva
+            String sqlGet = "SELECT id_copia, id_usuario FROM Reservas WHERE id_reserva = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlGet)){
+                ps.setInt(1, idReserva);
+                ResultSet rs = ps.executeQuery();
+                if(rs.next()) {
+                    idCopia = rs.getInt("id_copia");
+                    idUsuario = rs.getInt("id_usuario");
+                } else return false;
+            }
+
+            // 2. Insertar Préstamo
+            String sqlInsert = "INSERT INTO Prestamos (id_usuario, id_copia, fecha_prestamo, estado) VALUES (?, ?, NOW(), 'Activo')";
+            try(PreparedStatement ps = conn.prepareStatement(sqlInsert)){
+                ps.setInt(1, idUsuario);
+                ps.setInt(2, idCopia);
+                ps.executeUpdate();
+            }
+
+            // 3. Eliminar Reserva
+            String sqlDel = "DELETE FROM Reservas WHERE id_reserva = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlDel)){
+                ps.setInt(1, idReserva);
+                ps.executeUpdate();
+            }
+
+            // 4. Actualizar Copia a 'Prestado'
+            String sqlUp = "UPDATE Copias SET estado = 'Prestado' WHERE id_copia = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlUp)){
+                ps.setInt(1, idCopia);
+                ps.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            if(conn!=null) try{conn.rollback();}catch(Exception ex){}
+            Logger.getLogger(ReservasModel.class.getName()).log(Level.SEVERE, null, e);
+            return false;
+        } finally {
+            if(conn!=null) try{conn.setAutoCommit(true);conn.close();}catch(Exception ex){}
+        }
+    }
+
     // Listar reservas (Filtra por usuario si no es admin)
     public List<JSONObject> listarReservas(int idUsuario, boolean esAdmin) {
         List<JSONObject> lista = new ArrayList<>();
-        String sql = "SELECT r.id_reserva, r.fecha_reserva, c.codigo_unico, e.titulo, u.nombre, u.apellido " +
+        String sql = "SELECT r.id_reserva, r.fecha_reserva, c.codigo_unico, e.titulo, u.nombre, u.apellido, u.correo " +
                 "FROM Reservas r " +
                 "JOIN Copias c ON r.id_copia = c.id_copia " +
                 "JOIN Ejemplares e ON c.id_ejemplar = e.id_ejemplar " +
@@ -76,6 +130,7 @@ public class ReservasModel extends Conexion {
                 obj.put("codigo", rs.getString("codigo_unico"));
                 obj.put("titulo", rs.getString("titulo"));
                 obj.put("usuario", rs.getString("nombre") + " " + rs.getString("apellido"));
+                obj.put("correo", rs.getString("correo"));
                 lista.add(obj);
             }
         } catch (Exception e) { e.printStackTrace(); }

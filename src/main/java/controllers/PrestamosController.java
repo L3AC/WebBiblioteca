@@ -12,9 +12,10 @@ import java.util.List;
 public class PrestamosController extends HttpServlet {
     PrestamosModel modelo = new PrestamosModel();
 
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         response.setContentType("application/json;charset=UTF-8");
         PrintWriter out = response.getWriter();
+        String op = request.getParameter("op");
         HttpSession session = request.getSession(false);
 
         if(session != null && session.getAttribute("usuario") != null){
@@ -23,10 +24,20 @@ public class PrestamosController extends HttpServlet {
             JSONObject rol = (JSONObject) usuario.get("rol");
             boolean esAdmin = "Administrador".equals(rol.get("nombre_rol"));
 
-            List<JSONObject> lista = modelo.listarPrestamos(idUsuario, esAdmin);
-            out.print(lista.toString());
+            if("listar".equals(op)){
+                List<JSONObject> lista = modelo.listarPrestamos(idUsuario, esAdmin);
+                out.print(lista.toString());
+            } else if("devolver".equals(op) && esAdmin){
+                int idPrestamo = Integer.parseInt(request.getParameter("idPrestamo"));
+                if(modelo.devolverPrestamo(idPrestamo)){
+                     out.print("{\"success\": true, \"message\": \"Devolución registrada\"}");
+                } else {
+                     out.print("{\"success\": false, \"message\": \"Error en devolución\"}");
+                }
+            }
         } else {
-            out.print("[]");
+            if("listar".equals(op)) out.print("[]");
+            else out.print("{\"success\": false, \"message\": \"Sesión expirada\"}");
         }
     }
 }
