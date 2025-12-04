@@ -1447,19 +1447,21 @@ public JSONObject obtenerPorId(int idEjemplar) {
                 }
             }
         } else if ("Tesis".equals(tipoDocumento)) {
-        String sql = "SELECT grado_academico, facultad FROM Tesis WHERE id_ejemplar = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idEjemplar);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    datos.put("facultad", rs.getString("facultad"));
-                    datos.put("grado_academico", rs.getString("grado_academico"));
+            String sql = "SELECT grado_academico, facultad FROM Tesis WHERE id_ejemplar = ?";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, idEjemplar);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        datos.put("facultad", rs.getString("facultad"));
+                        datos.put("grado_academico", rs.getString("grado_academico"));
+                    }
                 }
             }
-        }
-    }else if ("Revistas".equals(tipoDocumento)) {
-            String sql = "SELECT r.fecha_publicacion, r.id_tipo_revista, r.id_genero, g.nombre_genero " +
+        }else if ("Revistas".equals(tipoDocumento)) {
+            // Modificado para traer nombre_tipo_revista
+            String sql = "SELECT r.fecha_publicacion, tr.nombre_tipo_revista, g.nombre_genero " +
                     "FROM Revistas r " +
+                    "LEFT JOIN TiposRevista tr ON r.id_tipo_revista = tr.id_tipo_revista " +
                     "LEFT JOIN Generos g ON r.id_genero = g.id_genero " +
                     "WHERE r.id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -1469,14 +1471,17 @@ public JSONObject obtenerPorId(int idEjemplar) {
                         // IMPORTANTE: Convertir Date a String
                         java.util.Date fecha = rs.getDate("fecha_publicacion");
                         datos.put("fecha_publicacion", fecha != null ? fecha.toString() : "");
-                        datos.put("id_tipo_revista", rs.getObject("id_tipo_revista"));
-                        datos.put("id_genero", rs.getObject("id_genero"));
+                        datos.put("nombre_tipo_revista", rs.getString("nombre_tipo_revista")); // Guardamos el nombre
                         datos.put("nombre_genero", rs.getString("nombre_genero"));
                     }
                 }
             }
         } else if ("Periodicos".equals(tipoDocumento)) {
-            String sql = "SELECT fecha_publicacion, id_tipo_periodico FROM Periodicos WHERE id_ejemplar = ?";
+            // Modificado para traer nombre_tipo_periodico
+            String sql = "SELECT p.fecha_publicacion, tp.nombre_tipo_periodico " +
+                    "FROM Periodicos p " +
+                    "LEFT JOIN TiposPeriodico tp ON p.id_tipo_periodico = tp.id_tipo_periodico " +
+                    "WHERE p.id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -1484,12 +1489,16 @@ public JSONObject obtenerPorId(int idEjemplar) {
                         // IMPORTANTE: Convertir Date a String
                         java.util.Date fecha = rs.getDate("fecha_publicacion");
                         datos.put("fecha_publicacion", fecha != null ? fecha.toString() : "");
-                        datos.put("id_tipo_periodico", rs.getObject("id_tipo_periodico"));
+                        datos.put("nombre_tipo_periodico", rs.getString("nombre_tipo_periodico")); // Guardamos el nombre
                     }
                 }
             }
         } else if ("Cassettes".equals(tipoDocumento)) {
-            String sql = "SELECT duracion, id_tipo_cinta FROM Cassettes WHERE id_ejemplar = ?";
+            // Modificado para traer nombre_tipo_cinta
+            String sql = "SELECT c.duracion, tc.nombre_tipo_cinta " +
+                    "FROM Cassettes c " +
+                    "LEFT JOIN TiposCinta tc ON c.id_tipo_cinta = tc.id_tipo_cinta " +
+                    "WHERE c.id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -1497,17 +1506,21 @@ public JSONObject obtenerPorId(int idEjemplar) {
                         // IMPORTANTE: Convertir Time a String
                         Time duracion = rs.getTime("duracion");
                         datos.put("duracion", duracion != null ? duracion.toString() : "");
-                        datos.put("id_tipo_cinta", rs.getObject("id_tipo_cinta"));
+                        datos.put("nombre_tipo_cinta", rs.getString("nombre_tipo_cinta")); // Guardamos el nombre
                     }
                 }
             }
         } else if ("Documento".equals(tipoDocumento)) {
-            String sql = "SELECT id_tipo_detalle FROM Documentos WHERE id_ejemplar = ?";
+            // Modificado para traer nombre_tipo_detalle
+            String sql = "SELECT tdd.nombre_tipo_detalle " +
+                    "FROM Documentos d " +
+                    "LEFT JOIN TiposDocumentoDetalle tdd ON d.id_tipo_detalle = tdd.id_tipo_detalle " +
+                    "WHERE d.id_ejemplar = ?";
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setInt(1, idEjemplar);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
-                        datos.put("id_tipo_detalle", rs.getObject("id_tipo_detalle"));
+                        datos.put("nombre_tipo_detalle", rs.getString("nombre_tipo_detalle")); // Guardamos el nombre
                     }
                 }
             }

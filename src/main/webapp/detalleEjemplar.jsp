@@ -184,21 +184,21 @@
         }
         else if (tipo === 'Cassettes') {
             $('#val-duracion-cas').text(data.duracion || '-');
-            $('#val-tipo-cinta').text(data.id_tipo_cinta || '-'); // Idealmente traer nombre
+            $('#val-tipo-cinta').text(data.nombre_tipo_cinta || '-'); // Muestra el nombre
             $('.field-cassettes').fadeIn();
         }
         else if (tipo === 'Documento') {
-            $('#val-tipo-detalle').text(data.id_tipo_detalle || '-');
+            $('#val-tipo-detalle').text(data.nombre_tipo_detalle || '-'); // Muestra el nombre
             $('.field-documento').fadeIn();
         }
         else if (tipo === 'Periodicos') {
             $('#val-fecha-pub').text(data.fecha_publicacion || '-');
-            $('#val-tipo-periodico').text(data.id_tipo_periodico || '-');
+            $('#val-tipo-periodico').text(data.nombre_tipo_periodico || '-'); // Muestra el nombre
             $('.field-periodicos').fadeIn();
         }
         else if (tipo === 'Revistas') {
             $('#val-fecha-pub-rev').text(data.fecha_publicacion || '-');
-            $('#val-tipo-revista').text(data.id_tipo_revista || '-');
+            $('#val-tipo-revista').text(data.nombre_tipo_revista || '-'); // Muestra el nombre
             $('#val-genero-rev').text(data.nombre_genero || '-');
             $('.field-revistas').fadeIn();
         }
