@@ -49,4 +49,44 @@ public class PrestamosModel {
         return lista;
     }
 
+    public boolean devolverPrestamo(int idPrestamo) {
+        Connection conn = null;
+        try {
+            conn = getConnection();
+            conn.setAutoCommit(false);
+
+            int idCopia = 0;
+            
+            // Obtener id_copia
+            String sqlGet = "SELECT id_copia FROM Prestamos WHERE id_prestamo = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlGet)){
+                ps.setInt(1, idPrestamo);
+                ResultSet rs = ps.executeQuery();
+                if(rs.next()) idCopia = rs.getInt("id_copia");
+                else return false;
+            }
+
+            // Actualizar Préstamo
+            String sqlUpP = "UPDATE Prestamos SET fecha_devolucion = NOW(), estado = 'Devuelto' WHERE id_prestamo = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlUpP)){
+                ps.setInt(1, idPrestamo);
+                ps.executeUpdate();
+            }
+
+            // Liberar Copia
+            String sqlUpC = "UPDATE Copias SET estado = 'Disponible' WHERE id_copia = ?";
+            try(PreparedStatement ps = conn.prepareStatement(sqlUpC)){
+                ps.setInt(1, idCopia);
+                ps.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
+        } catch (SQLException e) {
+            if(conn!=null) try{conn.rollback();}catch(Exception ex){}
+            return false;
+        } finally {
+            if(conn!=null) try{conn.setAutoCommit(true);conn.close();}catch(Exception ex){}
+        }
+    }
 }

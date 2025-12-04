@@ -13,6 +13,18 @@
         <div class="col-md-12">
             <h3><span class="glyphicon glyphicon-bookmark"></span> Gestión de Reservas</h3>
             <hr>
+            
+            <c:if test="${sessionScope.usuario.rol.nombre_rol eq 'Administrador'}">
+                <div class="row" style="margin-bottom: 15px;">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-addon"><i class="glyphicon glyphicon-search"></i></span>
+                            <input type="text" id="searchReservas" class="form-control" placeholder="Buscar reserva (ID, Fecha, Título, Usuario)...">
+                        </div>
+                    </div>
+                </div>
+            </c:if>
+
             <div class="table-responsive">
                 <table class="table table-custom">
                     <thead>
@@ -35,7 +47,16 @@
 </div>
 
 <script>
-    $(document).ready(function() { cargarReservas(); });
+    $(document).ready(function() { 
+        cargarReservas(); 
+        
+        $("#searchReservas").on("keyup", function() {
+            var value = $(this).val().toLowerCase();
+            $("#bodyReservas tr").filter(function() {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+            });
+        });
+    });
 
     function cargarReservas() {
         $.ajax({
@@ -51,11 +72,35 @@
                 } else {
                     data.forEach(r => {
                         html += '<tr><td>'+r.id_reserva+'</td><td>'+r.fecha+'</td><td>'+r.titulo+'</td><td><span class="label label-info">'+r.codigo+'</span></td>';
-                        if(isAdmin) html += '<td>'+r.usuario+' ('+r.correo+')</td>';
-                        html += '<td><button class="btn btn-danger btn-sm" onclick="cancelarReserva('+r.id_reserva+')"><span class="glyphicon glyphicon-remove"></span> Cancelar</button></td></tr>';
+                        if(isAdmin) {
+                            html += '<td>'+r.usuario+' ('+r.correo+')</td>';
+                            html += '<td>';
+                            html += '<button class="btn btn-success btn-sm" onclick="aceptarReserva('+r.id_reserva+')" style="margin-right: 5px;" title="Aceptar Préstamo"><span class="glyphicon glyphicon-ok"></span></button>';
+                            html += '<button class="btn btn-danger btn-sm" onclick="cancelarReserva('+r.id_reserva+')" title="Cancelar Reserva"><span class="glyphicon glyphicon-remove"></span></button>';
+                            html += '</td></tr>';
+                        } else {
+                            html += '<td><button class="btn btn-danger btn-sm" onclick="cancelarReserva('+r.id_reserva+')"><span class="glyphicon glyphicon-remove"></span> Cancelar</button></td></tr>';
+                        }
                     });
                 }
                 $('#bodyReservas').html(html);
+            }
+        });
+    }
+
+    function aceptarReserva(id) {
+        alertify.confirm("¿Aceptar reserva y registrar préstamo?", function(e){
+            if(e){
+                $.ajax({
+                    url: '${contextPath}/reservas.do?op=aceptar',
+                    type: 'POST',
+                    data: { idReserva: id },
+                    dataType: 'json',
+                    success: function(resp) {
+                        if(resp.success) { alertify.success(resp.message); cargarReservas(); }
+                        else alertify.error(resp.message);
+                    }
+                });
             }
         });
     }

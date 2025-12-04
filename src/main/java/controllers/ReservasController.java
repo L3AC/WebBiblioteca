@@ -38,6 +38,13 @@ public class ReservasController extends HttpServlet {
             } else {
                 out.print("{\"success\": false, \"message\": \"Error: Copia no disponible\"}");
             }
+        } else if("aceptar".equals(op)){
+            int idReserva = Integer.parseInt(request.getParameter("idReserva"));
+            if(modelo.aceptarReserva(idReserva)){
+                out.print("{\"success\": true, \"message\": \"Préstamo registrado correctamente\"}");
+            } else {
+                out.print("{\"success\": false, \"message\": \"Error al registrar préstamo\"}");
+            }
         } else if("eliminar".equals(op)){
             int idReserva = Integer.parseInt(request.getParameter("idReserva"));
             if(modelo.cancelarReserva(idReserva)){
