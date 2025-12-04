@@ -1,118 +1,93 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<%@page contentType="text/html" pageEncoding="UTF-8"%>
+<%@ include file="../header.jsp" %> <!-- ? ESTE ES EL HEADER DINÁMICO -->
+
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>Nuevo libro</title>
-        <%@ include file='/cabecera.jsp' %>
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/css/select2.min.css" rel="stylesheet" />
-<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.6-rc.0/js/select2.min.js"></script>
-    </head>
-    <body>
-        <jsp:include page="/menu.jsp"/>
-        <div class="container">
-            <div class="row">
-                <h3>Nuevo libro</h3>
-            </div>
-            <div class="row">
-                <div class=" col-md-7">
-                   
-                    <c:if test="${not empty listaErrores}">
-                    <div class="alert alert-danger">
-                        <ul>
-                            <c:forEach var="errores"  items="${listaErrores}">
-                                <li>${errores}</li>
-                            </c:forEach>
-                        </ul>
-                    </div>
-                    </c:if>
-                    <form role="form" action="${contextPath}/libros.do" method="POST">
-                        <input type="hidden"  name="op" value="insertar">
-                        <div class="well well-sm"><strong><span class="glyphicon glyphicon-asterisk"></span>Campos requeridos</strong></div>
-                        <div class="form-group">
-                            
-                            <label for="codigo">Codigo del libro:</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" name="codigo"  id="codigo" value="${libro.codigoLibro}" placeholder="Ingresa el codigo del libro" >
-                                <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="nombre">Nombre del libro:</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" name="nombre" id="nombre"  value="${libro.nombreLibro}"  placeholder="Ingresa el nombre del libro" >
-                                <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="existencias">existencias:</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" id="existencias"  value="${libro.existencias}" name="existencias"  placeholder="Ingresa las existencias del libro">
-                                <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="precio">precio:</label>
-                            <div class="input-group">
-                                <input type="number" step="0.1" min="0"  class="form-control" id="precio"  value="${libro.precio}" name="precio"  placeholder="Ingresa el precio del libro" >
-                                <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="codigoEditorial">Editorial:</label>
-                            <div class="input-group">
-                                <select name="codigoEditorial" id="codigoEditorial" class="form-control">
-                                    <c:forEach items="${requestScope.listaEditoriales}" var="editorial">
-                                        <option value="${editorial.codigoEditorial}">${editorial.nombreEditorial}</option>
-                                    </c:forEach>
-                                </select>
-                                 <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="codigoAutor">Autor:</label>
-                            <div class="input-group">
-                                <select name="codigoAutor" id="codigoAutor" class="form-control">
-                                    <c:forEach var="autor" items="${requestScope.listaAutores}">
-                                        <option value="${autor.codigoAutor}">${autor.nombreAutor}</option>
-                                    </c:forEach>
-                                </select>
-                                 <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="codigoGenero">Genero:</label>
-                            <div class="input-group">
-                                <select name="idGenero" id="codigoGenero" class="form-control">
-                                    <c:forEach var="genero" items="${requestScope.listaGeneros}">
-                                        <option value="${genero.idGenero}">${genero.nombreGenero}</option>
-                                    </c:forEach>
-                                </select>
-                                 <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="descripcion">descripcion del libro:</label>
-                            <div class="input-group col-md-12">
-                                <textarea class="form-control" name="descripcion">
-                                    ${libro.descripcion}
-                                </textarea>
-                            </div>
-                        </div>
-                        <input type="submit" class="btn btn-info" value="Guardar" name="Guardar">
-                        <a class="btn btn-danger" href="${contextPath}/libros.do?op=listar">Cancelar</a>
-                    </form>
-                </div>
-            </div>  
+<head>
+    <title>Nuevo Rol</title>
+</head>
+<body>
+    <div class="container">
+        <div class="row">
+            <h3>Nuevo Rol</h3>
         </div>
-                    <script>
-                   
-                  $("#codigoAutor option[value="+ '${libro.codigoAutor}' +"]").attr("selected",true);
-                  $("#codigoEditorial option[value="+ '${libro.codigoEditorial}' +"]").attr("selected",true);
-                   $("#codigoGenero option[value="+ '${libro.idGenero}' +"]").attr("selected",true);
-                    </script>
-              
+        
+        <!-- ? Mensajes de éxito/error -->
+        <c:if test="${not empty exito}">
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <strong>? Éxito:</strong> ${exito}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </c:if>
+        <c:if test="${not empty fracaso}">
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>? Error:</strong> ${fracaso}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </c:if>
+        <c:if test="${not empty listaErrores}">
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>?? Errores de validación:</strong>
+                <ul class="mb-0">
+                    <c:forEach var="error" items="${requestScope.listaErrores}">
+                        <li>${error}</li>
+                    </c:forEach>
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </c:if>
+
+        <div class="row">
+            <div class="col-md-7">
+                <form id="rolForm" role="form" action="${contextPath}/roles.do" method="POST">
+                    <input type="hidden" name="op" value="insertar">
+                    <div class="well well-sm">
+                        <strong><span class="glyphicon glyphicon-asterisk"></span>Campos requeridos</strong>
+                    </div>
+                    <div class="form-group">
+                        <label for="nombre_rol">Nombre del Rol</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="nombre_rol" id="nombre_rol" placeholder="Ingresa el nombre del rol" required>
+                            <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="cant_max_prestamo">Cantidad Máxima de Préstamo</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="cant_max_prestamo" id="cant_max_prestamo" placeholder="Ingresa la cantidad máxima de préstamos" required min="0">
+                            <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="dias_prestamo">Días de Préstamo</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="dias_prestamo" id="dias_prestamo" placeholder="Ingresa los días de préstamo" required min="1">
+                            <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="mora_diaria">Mora Diaria</label>
+                        <div class="input-group">
+                            <input type="number" step="0.01" class="form-control" name="mora_diaria" id="mora_diaria" placeholder="Ingresa la mora diaria" required min="0">
+                            <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
+                        </div>
+                    </div>
+                    <input type="submit" class="btn btn-info" value="Guardar" name="Guardar">
+                    <a class="btn btn-danger" href="${contextPath}/roles.do?op=listar">Cancelar</a>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ? Opcional: Auto-cerrar alertas después de 5 segundos
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+    </script>
+</body>
 </html>
-
-
-

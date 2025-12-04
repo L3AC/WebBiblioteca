@@ -70,6 +70,7 @@
                         </li>
                         <li><a href="${contextPath}/ejemplares.do?op=listar">Ejemplares</a></li>
                         <li><a href="${contextPath}/usuarios.do?op=listar">Usuarios</a></li>
+                        <li><a href="${contextPath}/roles.do?op=listar">Roles</a></li>
                     </c:if>
 
                     <li><a href="${contextPath}/logout">LogOut</a></li>

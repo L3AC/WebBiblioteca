@@ -23,8 +23,7 @@ public class RolesModel extends Conexion {
             VALUES (?, ?, ?, ?)
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setString(1, nombre);
             Long cantMaxPrestamoLong = (Long) data.get("cant_max_prestamo");
@@ -53,8 +52,7 @@ public class RolesModel extends Conexion {
     // === VERIFICAR SI NOMBRE DE ROL EXISTE ===
     private boolean existeNombreRol(String nombre) {
         String sql = "SELECT 1 FROM Roles WHERE nombre_rol = ?";
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, nombre);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
@@ -73,8 +71,7 @@ public class RolesModel extends Conexion {
             WHERE id_rol = ?
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, idRol);
             try (ResultSet rs = ps.executeQuery()) {
@@ -101,12 +98,11 @@ public class RolesModel extends Conexion {
         String sql = """
             SELECT id_rol, nombre_rol, cant_max_prestamo, dias_prestamo, mora_diaria
             FROM Roles
+            WHEN id_rol>1
             ORDER BY id_rol
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
                 JSONObject rol = new JSONObject();
@@ -127,39 +123,55 @@ public class RolesModel extends Conexion {
 
     // === ACTUALIZAR ROL ===
     public boolean actualizarRol(JSONObject data) {
-        int idRol = ((Long) data.get("id_rol")).intValue();
-        String nombre = (String) data.get("nombre_rol");
+        try {
+            int idRol = ((Long) data.get("id_rol")).intValue();
+            String nombre = (String) data.get("nombre_rol");
 
-        if (existeNombreRol(nombre)) {
-            JSONObject existente = obtenerPorNombre(nombre);
-            if (existente != null && !existente.get("id_rol").equals((long) idRol)) {
-                Logger.getLogger(RolesModel.class.getName()).log(Level.SEVERE, "Actualización cancelada: nombre duplicado: {0}", nombre);
-                return false;
+            System.out.println("Actualizando rol - ID: " + idRol + ", Nombre: " + nombre);
+
+            if (existeNombreRol(nombre)) {
+                JSONObject existente = obtenerPorNombre(nombre);
+                if (existente != null && !existente.get("id_rol").equals((long) idRol)) {
+                    System.out.println("Nombre duplicado detectado para rol ID: " + idRol);
+                    Logger.getLogger(RolesModel.class.getName()).log(Level.SEVERE, "Actualización cancelada: nombre duplicado: {0}", nombre);
+                    return false;
+                }
             }
-        }
 
-        String sql = """
+            String sql = """
             UPDATE Roles
             SET nombre_rol = ?, cant_max_prestamo = ?, dias_prestamo = ?, mora_diaria = ?
             WHERE id_rol = ?
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+            try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setString(1, nombre);
-            Long cantMaxPrestamoLong = (Long) data.get("cant_max_prestamo");
-            ps.setInt(2, cantMaxPrestamoLong != null ? cantMaxPrestamoLong.intValue() : 0);
-            Long diasPrestamoLong = (Long) data.get("dias_prestamo");
-            ps.setInt(3, diasPrestamoLong != null ? diasPrestamoLong.intValue() : 0);
-            Double moraDiaria = (Double) data.get("mora_diaria");
-            ps.setDouble(4, moraDiaria != null ? moraDiaria : 0.0);
-            ps.setInt(5, idRol);
+                ps.setString(1, nombre);
+                Long cantMaxPrestamoLong = (Long) data.get("cant_max_prestamo");
+                ps.setInt(2, cantMaxPrestamoLong != null ? cantMaxPrestamoLong.intValue() : 0);
+                Long diasPrestamoLong = (Long) data.get("dias_prestamo");
+                ps.setInt(3, diasPrestamoLong != null ? diasPrestamoLong.intValue() : 0);
+                Double moraDiaria = (Double) data.get("mora_diaria");
+                ps.setDouble(4, moraDiaria != null ? moraDiaria : 0.0);
+                ps.setInt(5, idRol);
 
-            return ps.executeUpdate() > 0;
+                System.out.println("Ejecutando SQL: " + sql);
+                System.out.println("Parámetros: " + nombre + ", " + cantMaxPrestamoLong + ", " + diasPrestamoLong + ", " + moraDiaria + ", " + idRol);
 
-        } catch (SQLException e) {
-            Logger.getLogger(RolesModel.class.getName()).log(Level.SEVERE, "Error al actualizar rol ID: " + idRol, e);
+                int rowsAffected = ps.executeUpdate();
+                System.out.println("Filas afectadas: " + rowsAffected);
+
+                return rowsAffected > 0;
+
+            } catch (SQLException e) {
+                System.out.println("Error SQL: " + e.getMessage());
+                e.printStackTrace();
+                Logger.getLogger(RolesModel.class.getName()).log(Level.SEVERE, "Error al actualizar rol ID: " + idRol, e);
+                return false;
+            }
+        } catch (Exception e) {
+            System.out.println("Error general en actualizarRol: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
@@ -167,8 +179,7 @@ public class RolesModel extends Conexion {
     // === ELIMINAR ROL ===
     public boolean eliminarRol(int idRol) {
         String sql = "DELETE FROM Roles WHERE id_rol = ?";
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, idRol);
             return ps.executeUpdate() > 0;
         } catch (SQLException e) {
@@ -185,8 +196,7 @@ public class RolesModel extends Conexion {
             WHERE nombre_rol = ?
             """;
 
-        try (Connection conn = getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, nombre);
             try (ResultSet rs = ps.executeQuery()) {

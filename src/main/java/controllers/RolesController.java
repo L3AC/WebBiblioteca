@@ -181,11 +181,17 @@ public class RolesController extends HttpServlet {
             }
             String jsonString = sb.toString();
 
+            System.out.println("JSON recibido: " + jsonString);
+
             if (jsonString.isEmpty()) {
                 listaErrores.add("No se recibió información para modificar el rol.");
             } else {
                 JSONParser parser = new JSONParser();
                 JSONObject data = (JSONObject) parser.parse(jsonString);
+
+                System.out.println("Datos parseados: " + data.toJSONString());
+                System.out.println("ID Rol: " + data.get("id_rol"));
+                System.out.println("Nombre Rol: " + data.get("nombre_rol"));
 
                 // Validaciones
                 if (Validaciones.isEmpty((String) data.get("nombre_rol"))) {
@@ -217,8 +223,10 @@ public class RolesController extends HttpServlet {
                 }
             }
         } catch (IOException | ParseException ex) {
+            System.out.println("Error al procesar la solicitud: " + ex.getMessage());
+            ex.printStackTrace();
             Logger.getLogger(RolesController.class.getName()).log(Level.SEVERE, null, ex);
-            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud.\"}");
+            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud: " + ex.getMessage() + "\"}");
         }
     }
 

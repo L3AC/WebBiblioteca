@@ -106,8 +106,17 @@
                                     <td>${copia.codigo_unico}</td>
                                     <td>${copia.estado}</td>
                                     <td>
-                                        <button class="btn btn-warning btn-sm" onclick="abrirModalReserva('${copia.id_copia}', '${copia.codigo_unico}')">Reservar</button>
-                                        <button class="btn btn-danger btn-sm" onclick="eliminarCopia('${copia.id_copia}', '${copia.codigo_unico}')">Eliminar</button>
+                                        <c:choose>
+                                            <c:when test="${copia.estado eq 'Reservado'}">
+                                                <!-- No mostrar botones si está reservado -->
+                                                <span class="text-muted"></span>
+                                            </c:when>
+                                            <c:otherwise>
+                                                <!-- Mostrar botones solo si no está reservado -->
+                                                <button class="btn btn-warning btn-sm" onclick="abrirModalReserva('${copia.id_copia}', '${copia.codigo_unico}')">Reservar</button>
+                                                <button class="btn btn-danger btn-sm" onclick="eliminarCopia('${copia.id_copia}', '${copia.codigo_unico}')">Eliminar</button>
+                                            </c:otherwise>
+                                        </c:choose>
                                     </td>
                                 </tr>
                             </c:forEach>

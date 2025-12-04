@@ -1579,7 +1579,7 @@ public class EjemplaresModel extends Conexion {
 
         return datos.isEmpty() ? null : datos;
     }
-
+ 
     public List<JSONObject> buscarEjemplares(String criterio) {
         List<JSONObject> lista = new ArrayList<>();
         // Esta consulta busca en título, autor o tipo, y cuenta las copias disponibles
