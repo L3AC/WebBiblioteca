@@ -11,6 +11,10 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import model.AutoresModel;
 import model.EditorialesModel;
@@ -24,7 +28,6 @@ import model.TiposCintaModel;
 import model.TiposPeriodicoModel;
 import model.TiposRevistaModel;
 import utils.Validaciones;
-
 
 @WebServlet(name = "EjemplaresController", urlPatterns = {"/ejemplares.do"})
 public class EjemplaresController extends HttpServlet {
@@ -40,40 +43,42 @@ public class EjemplaresController extends HttpServlet {
     TiposPeriodicoModel tiposPeriodico = new TiposPeriodicoModel();
     TiposRevistaModel tiposRevista = new TiposRevistaModel();
 
-protected void processRequest(HttpServletRequest request, HttpServletResponse response)
-        throws ServletException, IOException {
-    response.setContentType("text/html;charset=UTF-8");
-    try (PrintWriter out = response.getWriter()) {
-        if (request.getParameter("op") == null) {
-            listar(request, response);
-            return;
-        }
+    protected void processRequest(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        response.setContentType("text/html;charset=UTF-8");
+        try (PrintWriter out = response.getWriter()) {
+            if (request.getParameter("op") == null) {
+                listar(request, response);
+                return;
+            }
 
-        String operacion = request.getParameter("op");
+            String operacion = request.getParameter("op");
 
-        if ("listar".equals(operacion)) {
-            listar(request, response);
-        } else if ("buscar".equals(operacion)) { 
-            buscar(request, response);
-        } else if ("nuevo".equals(operacion)) {
-            nuevo(request, response);
-        } else if ("insertar".equals(operacion)) {
-            insertar(request, response);
-        } else if ("obtener".equals(operacion)) {
-            obtener(request, response);
-        } else if ("modificar".equals(operacion)) {
-            modificar(request, response);
-        } else if ("eliminar".equals(operacion)) {
-            eliminar(request, response);
-        } else if ("detalles".equals(operacion)) {
-            detalles(request, response);
-        } else if ("crearCopias".equals(operacion)) {
-            crearCopias(request, response);
-        } else {
-            request.getRequestDispatcher("/error404.jsp").forward(request, response);
+            if ("listar".equals(operacion)) {
+                listar(request, response);
+            } else if ("buscar".equals(operacion)) {
+                buscar(request, response);
+            } else if ("nuevo".equals(operacion)) {
+                nuevo(request, response);
+            } else if ("insertar".equals(operacion)) {
+                insertar(request, response);
+            } else if ("obtener".equals(operacion)) {
+                obtener(request, response);
+            } else if ("modificar".equals(operacion)) {
+                modificar(request, response);
+            } else if ("eliminar".equals(operacion)) {
+                eliminar(request, response);
+            } else if ("detalles".equals(operacion)) {
+                detalles(request, response);
+            } else if ("crearCopias".equals(operacion)) {
+                crearCopias(request, response);
+            } else if ("eliminarCopia".equals(operacion)) {
+                eliminarCopia(request, response);
+            } else {
+                request.getRequestDispatcher("/error404.jsp").forward(request, response);
+            }
         }
     }
-}
 
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     @Override
@@ -135,7 +140,7 @@ protected void processRequest(HttpServletRequest request, HttpServletResponse re
                 while ((line = reader.readLine()) != null) {
                     sb.append(line);
                 }
-            }
+            }/*configuracion de pool de conexiones en el apache tomcat*/
             String jsonString = sb.toString();
 
             if (jsonString.isEmpty()) {
@@ -220,6 +225,7 @@ protected void processRequest(HttpServletRequest request, HttpServletResponse re
 
     private void modificar(HttpServletRequest request, HttpServletResponse response) {
         PrintWriter out = null;
+        String jsonResponse = null; // Variable para almacenar la respuesta
         try {
             out = response.getWriter();
             listaErrores.clear();
@@ -261,12 +267,31 @@ protected void processRequest(HttpServletRequest request, HttpServletResponse re
                 Long duracion = validarYConvertirLong(data.get("duracion"), "Duración", false);
                 Long anio = validarYConvertirLong(data.get("anio"), "Año", false);
                 Long numero = validarYConvertirLong(data.get("numero"), "Número", false);
+                String isbn = (String) data.get("isbn");
+                String idioma = (String) data.get("idioma");
+                String escala = (String) data.get("escala");
+                String tipoMapa = (String) data.get("tipo_mapa");
+                String gradoAcademico = (String) data.get("grado_academico");
+                String facultad = (String) data.get("facultad");
+                String duracionString = (String) data.get("duracion"); // Este viene como HH:MM:SS desde el input de tipo time
+// Convertir la fecha de string a Date si es necesario
+                String fechaPublicacionStr = (String) data.get("fecha_publicacion"); // YYYY-MM-DD
+                java.sql.Date fechaPublicacion = null;
+                if (fechaPublicacionStr != null && !fechaPublicacionStr.trim().isEmpty()) {
+                    try {
+                        LocalDate localDate = LocalDate.parse(fechaPublicacionStr, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                        fechaPublicacion = java.sql.Date.valueOf(localDate);
+                    } catch (DateTimeParseException e) {
+                        System.err.println("Error al parsear fecha_publicacion: " + fechaPublicacionStr + ". Error: " + e.getMessage());
+                    }
+                }
 
                 if (listaErrores.isEmpty()) {
                     // Usar el método del modelo que recibe parámetros ya validados
                     boolean ok = modelo.editarEjemplarDesdeJSON(
                             idEjemplar, data, idAutor, idEditorial, idGenero, idTipoDetalle, idTipoPeriodico,
-                            idTipoRevista, idTipoCinta, edicion, volumen, duracion, anio, numero
+                            idTipoRevista, idTipoCinta, edicion, volumen, duracion, anio, numero, isbn, idioma, escala, tipoMapa,
+                            gradoAcademico, facultad, duracionString, fechaPublicacion
                     );
                     if (ok) {
                         request.getSession().setAttribute("exito", "Ejemplar modificado exitosamente.");
@@ -282,8 +307,25 @@ protected void processRequest(HttpServletRequest request, HttpServletResponse re
             Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, null, ex);
             out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud: " + ex.getMessage() + "\"}");
         } finally {
-            if (out != null) {
-                out.close();
+            // --- ESTA PARTE ES CRUCIAL ---
+            try {
+                response.setContentType("application/json"); // Asegura el tipo de contenido
+                response.setCharacterEncoding("UTF-8");      // Asegura la codificación
+                out = response.getWriter(); // Obtener el writer aquí, al final
+                if (jsonResponse != null) {
+                    out.print(jsonResponse); // Escribir la respuesta acumulada
+                    out.flush(); // Forzar el envío inmediato
+                } else {
+                    // Caso extremo: no se generó ninguna respuesta
+                    out.print("{\"success\": false, \"message\": \"Error interno: no se generó respuesta.\"}");
+                }
+            } catch (IOException e) {
+                Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "Error al escribir la respuesta JSON", e);
+                // No se puede hacer mucho más aquí si no se puede escribir la respuesta
+            } finally {
+                if (out != null) {
+                    out.close(); // Cerrar el writer
+                }
             }
         }
     }
@@ -372,6 +414,127 @@ protected void processRequest(HttpServletRequest request, HttpServletResponse re
             }
         }
     }
+    // Nueva operación: crear copias adicionales para un ejemplar
+
+    private void crearCopias(HttpServletRequest request, HttpServletResponse response) {
+        PrintWriter out = null;
+        try {
+            out = response.getWriter();
+            int idEjemplar = Integer.parseInt(request.getParameter("idEjemplar"));
+            int cantidad = Integer.parseInt(request.getParameter("cantidad"));
+
+            if (cantidad < 1) {
+                out.print("{\"success\": false, \"message\": \"La cantidad de copias debe ser mayor a 0.\"}");
+                out.flush();
+                out.close();
+                return;
+            }
+
+            String tipoDocumento = null;
+            java.sql.Connection conn = null;
+            java.sql.PreparedStatement ps = null;
+            java.sql.ResultSet rs = null;
+            try {
+                conn = utils.ConexionBD.getConnection(); // Asegúrate de que este método maneje bien las excepciones
+                String sql = "SELECT tipo_documento FROM Ejemplares WHERE id_ejemplar = ?";
+                ps = conn.prepareStatement(sql);
+                ps.setInt(1, idEjemplar);
+                rs = ps.executeQuery();
+                if (rs.next()) {
+                    tipoDocumento = rs.getString("tipo_documento");
+                }
+            } catch (SQLException ex) {
+                Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "Error obteniendo tipo_documento", ex);
+                out.print("{\"success\": false, \"message\": \"Error interno al obtener datos del ejemplar.\"}");
+                out.flush();
+                out.close();
+                return; // Importante salir aquí si falla la consulta
+            } finally {
+                // Cerrar recursos
+                try {
+                    if (rs != null) {
+                        rs.close();
+                    }
+                } catch (SQLException e) {
+                    /* log */ }
+                try {
+                    if (ps != null) {
+                        ps.close();
+                    }
+                } catch (SQLException e) {
+                    /* log */ }
+                try {
+                    if (conn != null) {
+                        conn.close();
+                    }
+                } catch (SQLException e) {
+                    /* log */ }
+            }
+
+            if (tipoDocumento == null) {
+                out.print("{\"success\": false, \"message\": \"No se encontró el ejemplar.\"}");
+                out.flush();
+                out.close();
+                return;
+            }
+
+            boolean ok = false;
+            try {
+                // Asegúrate de que este método también esté protegido contra excepciones internas
+                ok = modelo.crearCopiasParaEjemplar(idEjemplar, tipoDocumento, cantidad);
+            } catch (Exception ex) { // Captura una excepción más general si es necesario
+                Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "Error en modelo.crearCopiasParaEjemplar", ex);
+                ok = false; // Asumimos fallo si hubo excepción
+            }
+
+            if (ok) {
+                out.print("{\"success\": true, \"message\": \"Copias creadas exitosamente.\"}");
+            } else {
+                out.print("{\"success\": false, \"message\": \"No se pudieron crear las copias.\"}");
+            }
+            out.flush();
+            out.close();
+
+        } catch (IOException ex) {
+            Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "Error escribiendo respuesta", ex);
+            // No se puede escribir respuesta aquí si out ya falló
+        }
+    }
+
+    private void eliminarCopia(HttpServletRequest request, HttpServletResponse response) {
+        PrintWriter out = null;
+        // REMOVIDO: int idEjemplar = Integer.parseInt(request.getParameter("idEjemplar")); // Ya no necesitas esto si solo devuelves JSON
+        try {
+            out = response.getWriter();
+            int idCopia = Integer.parseInt(request.getParameter("idCopia"));
+            boolean ok = modelo.eliminarCopia(idCopia);
+            if (ok) {
+                request.getSession().setAttribute("exito", "Ejemplar eliminado exitosamente.");
+                out.print("{\"success\": true, \"message\": \"Ejemplar eliminado exitosamente.\"}");
+            } else {
+                out.print("{\"success\": false, \"message\": \"No se pudo eliminar el ejemplar.\"}");
+            }
+            out.flush();
+            out.close();
+            // REMOVIDO: return; - implícito aquí
+
+        } catch (IOException | NumberFormatException ex) {
+            Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, null, ex);
+            if (out != null) {
+                out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud: " + ex.getMessage() + "\"}");
+                out.flush();
+                out.close();
+            } else {
+                try {
+                    response.getWriter().print("{\"success\": false, \"message\": \"Error al procesar la solicitud: " + ex.getMessage() + "\"}");
+                } catch (IOException e) {
+                    Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "Error al escribir respuesta de error", e);
+                }
+            }
+            // REMOVIDO: Bloque de forward dentro del catch
+        }
+        // REMOVIDO: El return aquí es implícito si no hay más código
+    }
 
     private void detalles(HttpServletRequest request, HttpServletResponse response) throws IOException {
         // 1. Definimos el tipo de contenido ANTES de cualquier cosa
@@ -425,56 +588,16 @@ protected void processRequest(HttpServletRequest request, HttpServletResponse re
             Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, "Error fatal en controlador I/O", ex);
         }
     }
-    // Nueva operación: crear copias adicionales para un ejemplar
-    private void crearCopias(HttpServletRequest request, HttpServletResponse response) {
-        PrintWriter out = null;
-        try {
-            out = response.getWriter();
-            int idEjemplar = Integer.parseInt(request.getParameter("idEjemplar"));
-            int cantidad = Integer.parseInt(request.getParameter("cantidad"));
 
-            if (cantidad < 1) {
-                out.print("{\"success\": false, \"message\": \"La cantidad de copias debe ser mayor a 0.\"}");
-                return;
-            }
-
-            String sql = "SELECT tipo_documento FROM Ejemplares WHERE id_ejemplar = ?";
-            java.sql.Connection conn = utils.ConexionBD.getConnection();
-            java.sql.PreparedStatement ps = conn.prepareStatement(sql);
-            ps.setInt(1, idEjemplar);
-            java.sql.ResultSet rs = ps.executeQuery();
-            String tipoDocumento = null;
-            if (rs.next()) {
-                tipoDocumento = rs.getString("tipo_documento");
-            }
-            rs.close();
-            ps.close();
-            conn.close();
-
-            if (tipoDocumento == null) {
-                out.print("{\"success\": false, \"message\": \"No se encontró el ejemplar.\"}");
-                return;
-            }
-
-            boolean ok = modelo.crearCopiasParaEjemplar(idEjemplar, tipoDocumento, cantidad);
-            if (ok) {
-                out.print("{\"success\": true, \"message\": \"Copias creadas exitosamente.\"}");
-            } else {
-                out.print("{\"success\": false, \"message\": \"No se pudieron crear las copias.\"}");
-            }
-        } catch (IOException | SQLException | NumberFormatException ex) {
-            Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, null, ex);
-            out.print("{\"success\": false, \"message\": \"Error al procesar la solicitud: " + ex.getMessage() + "\"}");
-        }
-    }
-    
     private void buscar(HttpServletRequest request, HttpServletResponse response) throws IOException {
-    // IMPORTANTE: Cambiamos el tipo de contenido a JSON
-    response.setContentType("application/json;charset=UTF-8");
-    PrintWriter out = response.getWriter();
-    
-    String criterio = request.getParameter("criterio");
-    if (criterio == null) criterio = ""; 
+        // IMPORTANTE: Cambiamos el tipo de contenido a JSON
+        response.setContentType("application/json;charset=UTF-8");
+        PrintWriter out = response.getWriter();
+
+        String criterio = request.getParameter("criterio");
+        if (criterio == null) {
+            criterio = "";
+        }
 
         try {
             // Llamamos al modelo
@@ -492,9 +615,8 @@ protected void processRequest(HttpServletRequest request, HttpServletResponse re
         } catch (Exception ex) {
             // Si falla, enviamos un array vacío para que no rompa el JS
             Logger.getLogger(EjemplaresController.class.getName()).log(Level.SEVERE, null, ex);
-            out.print("[]"); 
+            out.print("[]");
         }
     }
-    
-    
+
 }
