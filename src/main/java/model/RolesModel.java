@@ -97,9 +97,7 @@ public class RolesModel extends Conexion {
         List<JSONObject> lista = new ArrayList<>();
         String sql = """
             SELECT id_rol, nombre_rol, cant_max_prestamo, dias_prestamo, mora_diaria
-            FROM Roles
-            WHEN id_rol>1
-            ORDER BY id_rol
+            FROM Roles WHERE id_rol>1 ORDER BY id_rol
             """;
 
         try (Connection conn = getConnection(); PreparedStatement ps = conn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
@@ -129,14 +127,14 @@ public class RolesModel extends Conexion {
 
             System.out.println("Actualizando rol - ID: " + idRol + ", Nombre: " + nombre);
 
-            if (existeNombreRol(nombre)) {
+            /*if (existeNombreRol(nombre)) {
                 JSONObject existente = obtenerPorNombre(nombre);
                 if (existente != null && !existente.get("id_rol").equals((long) idRol)) {
                     System.out.println("Nombre duplicado detectado para rol ID: " + idRol);
                     Logger.getLogger(RolesModel.class.getName()).log(Level.SEVERE, "Actualización cancelada: nombre duplicado: {0}", nombre);
                     return false;
                 }
-            }
+            }*/
 
             String sql = """
             UPDATE Roles

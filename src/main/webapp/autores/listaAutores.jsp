@@ -1,72 +1,69 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
-<%@page contentType="text/html" pageEncoding="UTF-8"%>
+<%@ include file="../header.jsp" %>
+
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>Lista de autores</title>
-         <%@ include file='/cabecera.jsp' %>
-    </head>
-    <body>
-        <jsp:include page="/menu.jsp"/>
-        <div class="container">
-            <div class="row">
-                <h3>Lista de autores</h3>
-            </div>
-            <div class="row">
-                <div class="col-md-10">
-                    <a type="button" class="btn btn-primary btn-md" href="${contextPath}/autores.do?op=nuevo"> Nuevo autor</a>
+<head>
+    <title>Lista de Autores</title>
+</head>
+<body>
+    <div class="container ">
+        <div class="row pt-5">
+            <h3>Lista de Autores</h3>
+        </div>
+        <div class="row">
+            <div class="col-md-12">
+                <a type="button" class="btn btn-primary btn-md" href="${contextPath}/autores.do?op=nuevo">Nuevo Autor</a>
                 <br/><br/>
                 <table class="table table-striped table-bordered table-hover" id="tabla">
                     <thead>
                         <tr>
-                            <th>Codigo del autor</th>
-                            <th>Nombre del autor</th>
-                            <th>Nacionalidad</th>
+                            <th>ID</th>
+                            <th>Nombre</th>
                             <th>Operaciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        
-                        <c:forEach items="${requestScope.listaAutores}" var="autores">
-                         <tr>
-                                <td>${autores.codigoAutor}</td>
-                                <td>${autores.nombreAutor}</td>
-                                <td>${autores.nacionalidad}</td>
+                        <c:forEach items="${requestScope.listaAutores}" var="autor">
+                            <tr>
+                                <td>${autor.id_autor}</td>
+                                <td>${autor.nombre_autor}</td>
                                 <td>
-                                    <a class="btn btn-primary" href="${contextPath}/autores.do?op=obtener&id=${autores.codigoAutor}"><span class="glyphicon glyphicon-edit"></span> Editar</a>
-                                    <a  class="btn btn-danger" href="javascript:eliminar('${autores.codigoAutor}')"><span class="glyphicon glyphicon-trash"></span> Eliminar</a>
+                                    <a class="btn btn-primary" href="${contextPath}/autores.do?op=obtener&id=${autor.id_autor}">
+                                        <span class="glyphicon glyphicon-edit"></span> Editar
+                                    </a>
+                                    <a class="btn btn-danger" href="javascript:eliminar('${autor.id_autor}')">
+                                        <span class="glyphicon glyphicon-trash"></span> Eliminar
+                                    </a>
                                 </td>
                             </tr>
-                       </c:forEach>
-                           
-                   
+                        </c:forEach>
                     </tbody>
                 </table>
-                </div>
-                
-            </div>                    
-        </div> 
-        <script>
-            $(document).ready(function(){
-               $('#tabla').DataTable(); 
+            </div>
+        </div>
+    </div>
+    <script>
+        $(document).ready(function(){
+           $('#tabla').DataTable();
+        });
+
+        <c:if test="${not empty exito}">
+            alertify.success('${exito}');
+            <c:set var="exito" value="" scope="session" />
+        </c:if>
+        <c:if test="${not empty fracaso}">
+            alertify.error('${fracaso}');
+            <c:set var="fracaso" value="" scope="session" />
+        </c:if>
+
+        function eliminar(id){
+            alertify.confirm("¿Realmente desea eliminar este autor?", function(e){
+                if(e){
+                    location.href="${contextPath}/autores.do?op=eliminar&id="+ id;
+                }
             });
-                       <c:if test="${not empty exito}">
-                           alertify.success('${exito}');
-                          <c:set var="exito" value="" scope="session" />
-                       </c:if>
-                           <c:if test="${not empty fracaso}">
-                           alertify.error('${fracaso}');
-                           <c:set var="fracaso" value="" scope="session" />
-                       </c:if>
-         function eliminar(id){
-           alertify.confirm("Â¿Realmente decea eliminar este Autor?", function(e){
-              if(e){
-                  location.href="autores.do?op=eliminar&id="+ id;
-              } 
-           });
-  }
-        </script>
-    </body>
+        }
+    </script>
+</body>
 </html>
-
-

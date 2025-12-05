@@ -4,12 +4,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Editar Editorial</title>
+    <title>Editar Género</title>
 </head>
 <body>
     <div class="container">
         <div class="row">
-            <h3>Editar Editorial</h3>
+            <h3>Editar Género</h3>
         </div>
         <div class="row">
             <div class="col-md-7">
@@ -23,31 +23,31 @@
                     </div>
                 </c:if>
                 
-                <form id="editorialForm" role="form" method="POST">
+                <form id="generoForm" role="form" method="POST">
                     <input type="hidden" name="op" value="modificar">
-                    <input type="hidden" name="id_editorial" value="${editorial.id_editorial}">
+                    <input type="hidden" name="id_genero" value="${genero.id_genero}">
                     <div class="well well-sm">
                         <strong><span class="glyphicon glyphicon-asterisk"></span>Campos requeridos</strong>
                     </div>
                     
                     <div class="form-group">
-                        <label for="nombre_editorial">Nombre de la Editorial</label>
+                        <label for="nombre_genero">Nombre del Género</label>
                         <div class="input-group">
-                            <input type="text" class="form-control" name="nombre_editorial" id="nombre_editorial" 
-                                   value="${editorial.nombre_editorial}" placeholder="Ingresa el nombre de la editorial" required>
+                            <input type="text" class="form-control" name="nombre_genero" id="nombre_genero" 
+                                   value="${genero.nombre_genero}" placeholder="Ingresa el nombre del género" required>
                             <span class="input-group-addon"><span class="glyphicon glyphicon-asterisk"></span></span>
                         </div>
                     </div>
                     
                     <input type="submit" class="btn btn-info" value="Guardar" name="Guardar">
-                    <a class="btn btn-danger" href="${contextPath}/editoriales.do?op=listar">Cancelar</a>
+                    <a class="btn btn-danger" href="${contextPath}/generos.do?op=listar">Cancelar</a>
                 </form>
             </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('editorialForm').addEventListener('submit', function (e) {
+        document.getElementById('generoForm').addEventListener('submit', function (e) {
             e.preventDefault();
 
             console.log('Formulario enviado, iniciando fetch...');
@@ -55,14 +55,14 @@
             const formData = new FormData(this);
             const data = Object.fromEntries(formData.entries());
 
-            // Convertir id_editorial a número si es necesario
-            if (data.id_editorial) {
-                data.id_editorial = parseInt(data.id_editorial, 10);
+            // Convertir id_genero a número si es necesario
+            if (data.id_genero) {
+                data.id_genero = parseInt(data.id_genero, 10);
             }
 
             console.log('Datos enviados:', data);
 
-            fetch('${contextPath}/editoriales.do?op=modificar', {
+            fetch('${contextPath}/generos.do?op=modificar', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -77,7 +77,7 @@
                 console.log('JSON recibido:', result);
                 if (result.success) {
                     alertify.success(result.message);
-                    window.location.href = '${contextPath}/editoriales.do?op=listar';
+                    window.location.href = '${contextPath}/generos.do?op=listar';
                 } else {
                     if (result.errors) {
                         alertify.error(result.errors.join('<br>'));

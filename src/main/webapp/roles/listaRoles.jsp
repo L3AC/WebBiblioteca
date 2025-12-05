@@ -36,9 +36,6 @@
                                     <a class="btn btn-primary" href="${contextPath}/roles.do?op=obtener&id=${rol.id_rol}">
                                         <span class="glyphicon glyphicon-edit"></span> Editar
                                     </a>
-                                    <a class="btn btn-danger" href="javascript:eliminar('${rol.id_rol}')">
-                                        <span class="glyphicon glyphicon-trash"></span> Eliminar
-                                    </a>
                                 </td>
                             </tr>
                         </c:forEach>
