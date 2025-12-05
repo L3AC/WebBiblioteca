@@ -33,11 +33,24 @@ public class ReservasController extends HttpServlet {
             out.print(lista.toString());
         } else if("crear".equals(op)){
             int idCopia = Integer.parseInt(request.getParameter("idCopia"));
-            if(modelo.reservarCopia(idCopia, idUsuario)){
-                out.print("{\"success\": true, \"message\": \"Reserva realizada con éxito\"}");
+
+            // --- NUEVA VALIDACIÓN DE MORA ---
+            // 1. Instanciamos el modelo de usuario para verificar deudas
+            model.UsuarioModel usuarioModel = new model.UsuarioModel();
+            double deuda = usuarioModel.calcularMoraActual(idUsuario);
+
+            if (deuda > 0) {
+                // 2. Si tiene deuda, bloqueamos la operación y devolvemos mensaje de error
+                out.print("{\"success\": false, \"message\": \"No puede reservar: Tiene una mora pendiente de $" + String.format("%.2f", deuda) + "\"}");
             } else {
-                out.print("{\"success\": false, \"message\": \"Error: Copia no disponible\"}");
+                // 3. Si no tiene deuda, procedemos con la lógica original
+                if(modelo.reservarCopia(idCopia, idUsuario)){
+                    out.print("{\"success\": true, \"message\": \"Reserva realizada con éxito\"}");
+                } else {
+                    out.print("{\"success\": false, \"message\": \"Error: Copia no disponible\"}");
+                }
             }
+    } else if("aceptar".equals(op)){
         } else if("aceptar".equals(op)){
             int idReserva = Integer.parseInt(request.getParameter("idReserva"));
             if(modelo.aceptarReserva(idReserva)){

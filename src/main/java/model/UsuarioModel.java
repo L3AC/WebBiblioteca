@@ -325,5 +325,34 @@ public class UsuarioModel extends Conexion {
             return false;
         }
     }
+        public double calcularMoraActual(int idUsuario) {
+        double moraTotal = 0.0;
+        // Esta consulta calcula los días de retraso multiplicados por la mora diaria del rol
+        // solo para préstamos activos que ya pasaron su fecha límite.
+        String sql = """
+            SELECT 
+                SUM(DATEDIFF(CURRENT_DATE, DATE_ADD(p.fecha_prestamo, INTERVAL r.dias_prestamo DAY)) * r.mora_diaria) as total_mora
+            FROM Prestamos p
+            JOIN Usuarios u ON p.id_usuario = u.id_usuario
+            JOIN Roles r ON u.id_rol = r.id_rol
+            WHERE p.id_usuario = ? 
+              AND p.estado = 'Activo'
+              AND CURRENT_DATE > DATE_ADD(p.fecha_prestamo, INTERVAL r.dias_prestamo DAY)
+        """;
+
+        try (Connection conn = getConnection(); 
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, idUsuario);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    moraTotal = rs.getDouble("total_mora");
+                }
+            }
+        } catch (SQLException e) {
+            Logger.getLogger(UsuarioModel.class.getName()).log(Level.SEVERE, "Error al calcular mora", e);
+        }
+        return moraTotal;
+    }
 
 }
